@@ -1,13 +1,9 @@
 import { apiRequest } from './apiClient'
-import type { ApiKey, HostTelemetry } from '@/types'
+import type { ApiKey, ApiKeyCreated, TelemetrySnapshot } from '@/types'
 
 export const telemetryApi = {
-  history(
-    hostId: string,
-    params: { from: string; to: string },
-  ): Promise<HostTelemetry> {
-    const q = new URLSearchParams(params)
-    return apiRequest<HostTelemetry>(`/hosts/${hostId}/telemetry?${q}`)
+  get(hostId: string): Promise<TelemetrySnapshot> {
+    return apiRequest<TelemetrySnapshot>(`/hosts/${hostId}/telemetry`)
   },
 }
 
@@ -19,8 +15,8 @@ export const apiKeysApi = {
   create(payload: {
     name: string
     expires_at?: string | null
-  }): Promise<ApiKey & { raw_key: string }> {
-    return apiRequest<ApiKey & { raw_key: string }>('/api-keys', {
+  }): Promise<ApiKeyCreated> {
+    return apiRequest<ApiKeyCreated>('/api-keys', {
       method: 'POST',
       body: payload,
     })

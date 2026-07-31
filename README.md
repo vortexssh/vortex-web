@@ -1,67 +1,42 @@
 # Vortex Web
 
-Cloud admin console for the VortexSSH hybrid ecosystem — telemetry, host manager, WebSSH terminal, and task scheduler.
+Cloud admin console for VortexSSH — talks to **Vortex Core** (`/api/v1` + `/ws`).
 
-## Stack
-
-- Vite + React 19 + TypeScript (strict)
-- Tailwind CSS v4
-- React Router · Zustand · TanStack Query · Recharts · xterm.js
-- MSW mock API (default) until Vortex Core is available
-
-## Quick start
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Demo credentials (MSW): `admin@vortex.local` / `vortex123`
+With Core on `:8000`, Vite proxies `/api` and `/ws`. Set `VITE_USE_MSW=false` in `.env`.
 
-After login, enable 2FA (any 6-digit code against the mock) to unlock Dashboard, Hosts, WebSSH, and Tasks.
+## Production deploy (Docker + Nginx)
+
+Production domain: `https://vortex.timant32.ru` → API `https://api.vortex.timant32.ru`.
+
+```bash
+# On the VPS
+mkdir -p /opt/vortex-web && cd /opt/vortex-web
+git clone https://github.com/vortexssh/vortex-web.git .
+cp .env.production.example .env
+bash deploy/deploy.sh
+```
+
+Container listens on `127.0.0.1:18080`. Host nginx terminates TLS for `vortex.timant32.ru`.
+
+**Required on Core:** `CORS_ORIGINS` must include `https://vortex.timant32.ru`.
 
 ## Environment
 
-Copy [`.env.example`](.env.example):
+| Variable | Purpose |
+|---|---|
+| `VITE_API_URL` | REST base (prod: `https://api.vortex.timant32.ru/api/v1`) |
+| `VITE_WS_URL` | WS base (prod: `wss://api.vortex.timant32.ru/ws`) |
+| `VITE_AGENT_CORE_URL` | Agent outbound WSS base |
+| `VITE_USE_MSW` | Offline mocks (`true` only for local UI without Core) |
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `VITE_API_URL` | `/api` | REST base path |
-| `VITE_WS_URL` | derived from host | WebSocket base (`…/ws`) |
-| `VITE_USE_MSW` | `true` | `false` to hit real Vortex Core via Vite proxy |
+## Security
 
-When integrating Core:
-
-```bash
-VITE_USE_MSW=false npm run dev
-```
-
-Vite proxies `/api` and `/ws` to `http://127.0.0.1:8000`.
-
-## Security invariants
-
-- Frontend stores **metadata only** — no SSH passwords or private keys in forms/API payloads.
-- Routes Dashboard / Hosts / WebSSH / Tasks redirect to `/security/2fa` when `is_2fa_enabled` is false.
-- JWT access token lives in `sessionStorage` (`vortex_access_token`) until Core supports httpOnly cookies.
-
-## Scripts
-
-```bash
-npm run dev
-npm run build
-npm run preview
-npm run lint
-```
-
-## Project layout
-
-```
-src/
-  components/   # layout, auth gates, UI kit
-  features/     # auth, dashboard, hosts, terminal, tasks, settings
-  hooks/        # useWebSocket, useTelemetrySocket, useTerminalSocket
-  mocks/        # MSW handlers + in-memory DB
-  services/     # REST clients
-  store/        # Zustand auth
-  types/        # API contracts aligned with ТЗ §5
-```
+- No SSH passwords / private keys in the browser.
+- Dashboard / Hosts / WebSSH / Tasks require `is_2fa_enabled`.

@@ -7,12 +7,23 @@ import type {
 } from '@/types'
 
 export const tasksApi = {
-  list(): Promise<Task[]> {
-    return apiRequest<Task[]>('/tasks')
+  listForHost(hostId: string): Promise<Task[]> {
+    return apiRequest<Task[]>(`/hosts/${hostId}/tasks`)
   },
 
-  create(payload: CreateTaskPayload): Promise<Task> {
-    return apiRequest<Task>('/tasks', { method: 'POST', body: payload })
+  /** Aggregate tasks across hosts (Web convenience). */
+  async listAll(hostIds: string[]): Promise<Task[]> {
+    const batches = await Promise.all(
+      hostIds.map((id) => tasksApi.listForHost(id).catch(() => [] as Task[])),
+    )
+    return batches.flat()
+  },
+
+  create(hostId: string, payload: CreateTaskPayload): Promise<Task> {
+    return apiRequest<Task>(`/hosts/${hostId}/tasks`, {
+      method: 'POST',
+      body: payload,
+    })
   },
 
   update(id: string, payload: UpdateTaskPayload): Promise<Task> {
@@ -23,8 +34,8 @@ export const tasksApi = {
     return apiRequest<void>(`/tasks/${id}`, { method: 'DELETE' })
   },
 
-  run(id: string): Promise<TaskLog> {
-    return apiRequest<TaskLog>(`/tasks/${id}/run`, { method: 'POST' })
+  run(id: string): Promise<Task> {
+    return apiRequest<Task>(`/tasks/${id}/run`, { method: 'POST' })
   },
 
   logs(id: string): Promise<TaskLog[]> {

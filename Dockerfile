@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY index.html ./
+COPY public ./public
+COPY tsconfig.json tsconfig.app.json tsconfig.node.json ./
+COPY vite.config.ts ./
+COPY src ./src
+
+# Baked at build time (Vite)
+ARG VITE_API_URL=https://api.vortex.timant32.ru/api/v1
+ARG VITE_WS_URL=wss://api.vortex.timant32.ru/ws
+ARG VITE_AGENT_CORE_URL=wss://api.vortex.timant32.ru
+ARG VITE_AGENT_BINARY_BASE_URL=
+ARG VITE_USE_MSW=false
+
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_WS_URL=$VITE_WS_URL \
+    VITE_AGENT_CORE_URL=$VITE_AGENT_CORE_URL \
+    VITE_AGENT_BINARY_BASE_URL=$VITE_AGENT_BINARY_BASE_URL \
+    VITE_USE_MSW=$VITE_USE_MSW
+
+RUN npm run build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY deploy/nginx-spa.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/healthz || exit 1

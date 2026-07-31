@@ -1,57 +1,124 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Activity } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { authApi } from '@/services/authApi'
+import { apiKeysApi } from '@/services/telemetryApi'
 import { ApiError } from '@/services/apiClient'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/components/ui/Toast'
+import {
+  buildTuiCallbackUrl,
+  parseTuiLinkParams,
+  tuiLinkQuery,
+  type TuiLinkParams,
+} from '@/features/auth/tuiLink'
+
+async function completeTuiLink(link: TuiLinkParams, email: string) {
+  const created = await apiKeysApi.create({ name: 'Vortex TUI' })
+  if (!created.key?.startsWith('vxk_')) {
+    throw new Error('Failed to issue API key for TUI')
+  }
+  window.location.assign(
+    buildTuiCallbackUrl(link.redirectUri, {
+      token: created.key,
+      state: link.state,
+      email,
+    }),
+  )
+}
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const setSession = useAuthStore((s) => s.setSession)
   const user = useAuthStore((s) => s.user)
-  const [email, setEmail] = useState('admin@vortex.local')
-  const [password, setPassword] = useState('vortex123')
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [totpStep, setTotpStep] = useState(false)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [linking, setLinking] = useState(false)
 
-  if (user) return <Navigate to="/" replace />
+  const tuiLink = useMemo(
+    () => parseTuiLinkParams(searchParams.toString()),
+    [searchParams],
+  )
+
+  // Already signed in + TUI device link → mint key and bounce back.
+  useEffect(() => {
+    if (!tuiLink || !user || !accessToken || linking) return
+    let cancelled = false
+    setLinking(true)
+    void (async () => {
+      try {
+        await completeTuiLink(tuiLink, user.email)
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to link TUI')
+          setLinking(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [tuiLink, user, accessToken, linking])
+
+  if (user && !tuiLink) return <Navigate to="/" replace />
+
+  async function finishLogin(accessTokenValue: string) {
+    authApi.persistSession({ access_token: accessTokenValue, token_type: 'bearer' })
+    const me = await authApi.me()
+    setSession(me, accessTokenValue)
+    if (tuiLink) {
+      await completeTuiLink(tuiLink, me.email)
+      return
+    }
+    navigate(me.is_2fa_enabled ? '/' : '/security/2fa')
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      if (totpStep) {
-        const res = await authApi.verifyLoginTotp({ email, code })
-        authApi.persistSession(res)
-        setSession(res.user, res.access_token)
-        navigate(res.user.is_2fa_enabled ? '/' : '/security/2fa')
-        return
-      }
-
-      const res = await authApi.login({ email, password })
-      if (res.requires_2fa) {
+      const tokens = await authApi.login({
+        email,
+        password,
+        totp_code: totpStep ? code : undefined,
+      })
+      await finishLogin(tokens.access_token)
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'totp_required') {
         setTotpStep(true)
         toast('Enter your authenticator code')
+        setError(null)
         return
       }
-      authApi.persistSession(res)
-      setSession(res.user, res.access_token)
-      navigate(res.user.is_2fa_enabled ? '/' : '/security/2fa')
-    } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed')
     } finally {
       setLoading(false)
     }
   }
 
+  const subtitle = tuiLink
+    ? 'Link Vortex TUI · return to the terminal after sign-in'
+    : 'Cloud console · JWT session via Vortex Core'
+
+  if (tuiLink && user && linking && !error) {
+    return (
+      <AuthShell title="Linking TUI…" subtitle={subtitle}>
+        <p className="font-mono text-sm text-muted">Issuing API key and returning to the app…</p>
+      </AuthShell>
+    )
+  }
+
   return (
-    <AuthShell title="Sign in" subtitle="Cloud console · JWT session">
+    <AuthShell title="Sign in" subtitle={subtitle}>
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         {!totpStep ? (
           <>
@@ -73,30 +140,46 @@ export function LoginPage() {
             />
           </>
         ) : (
-          <Input
-            label="Authenticator code"
-            inputMode="numeric"
-            pattern="\d{6}"
-            maxLength={6}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="6-digit TOTP"
-            required
-          />
+          <>
+            <p className="font-mono text-xs text-muted">{email}</p>
+            <Input
+              label="Authenticator code"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={8}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="6-digit TOTP"
+              required
+            />
+          </>
         )}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? '…' : totpStep ? 'Verify 2FA' : 'Login'}
+        <Button type="submit" disabled={loading || linking} className="w-full">
+          {loading || linking ? '…' : totpStep ? 'Verify 2FA' : tuiLink ? 'Login & link TUI' : 'Login'}
         </Button>
+        {totpStep ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setTotpStep(false)
+              setCode('')
+            }}
+          >
+            Back
+          </Button>
+        ) : null}
       </form>
       <p className="mt-4 text-center text-sm text-muted">
         No account?{' '}
-        <Link className="text-neon hover:underline" to="/register">
+        <Link
+          className="text-neon hover:underline"
+          to={tuiLink ? `/register?${tuiLinkQuery(tuiLink)}` : '/register'}
+        >
           Register
         </Link>
-      </p>
-      <p className="mt-2 text-center font-mono text-[10px] text-muted">
-        demo · admin@vortex.local / vortex123
       </p>
     </AuthShell>
   )
@@ -104,6 +187,7 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const setSession = useAuthStore((s) => s.setSession)
   const user = useAuthStore((s) => s.user)
   const [email, setEmail] = useState('')
@@ -111,16 +195,27 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  if (user) return <Navigate to="/" replace />
+  const tuiLink = useMemo(
+    () => parseTuiLinkParams(searchParams.toString()),
+    [searchParams],
+  )
+
+  if (user && !tuiLink) return <Navigate to="/" replace />
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      const res = await authApi.register({ email, password })
-      authApi.persistSession(res)
-      setSession(res.user, res.access_token)
+      await authApi.register({ email, password })
+      const tokens = await authApi.login({ email, password })
+      authApi.persistSession(tokens)
+      const me = await authApi.me()
+      setSession(me, tokens.access_token)
+      if (tuiLink) {
+        await completeTuiLink(tuiLink, me.email)
+        return
+      }
       navigate('/security/2fa')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Registration failed')
@@ -130,7 +225,14 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthShell title="Create account" subtitle="Metadata-only cloud panel">
+    <AuthShell
+      title="Create account"
+      subtitle={
+        tuiLink
+          ? 'Register · then return to Vortex TUI'
+          : 'Metadata-only cloud panel'
+      }
+    >
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         <Input
           label="Email"
@@ -149,12 +251,15 @@ export function RegisterPage() {
         />
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button type="submit" disabled={loading} className="w-full">
-          {loading ? '…' : 'Register'}
+          {loading ? '…' : tuiLink ? 'Register & link TUI' : 'Register'}
         </Button>
       </form>
       <p className="mt-4 text-center text-sm text-muted">
         Already registered?{' '}
-        <Link className="text-neon hover:underline" to="/login">
+        <Link
+          className="text-neon hover:underline"
+          to={tuiLink ? `/login?${tuiLinkQuery(tuiLink)}` : '/login'}
+        >
           Sign in
         </Link>
       </p>

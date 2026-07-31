@@ -1,103 +1,110 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { ApiError } from '@/services/apiClient'
 import { telemetryApi } from '@/services/telemetryApi'
-import { TOKEN_STORAGE_KEY } from '@/config/env'
-import { db } from '@/mocks/db'
-import { USE_MSW } from '@/config/env'
 import type { TelemetryPoint } from '@/types'
-import { useWebSocket } from './useWebSocket'
-
-function rangeIso(hours: number): { from: string; to: string } {
-  const to = new Date()
-  const from = new Date(to.getTime() - hours * 3600_000)
-  return { from: from.toISOString(), to: to.toISOString() }
-}
 
 interface UseTelemetryOptions {
   hostId: string | null
-  hours: number
   enabled?: boolean
+  pollIntervalMs?: number
 }
 
+/**
+ * Core stores a single Redis snapshot (TTL), not a time series.
+ * Web polls GET /hosts/{id}/telemetry and builds a rolling chart buffer.
+ */
 export function useTelemetrySocket({
   hostId,
-  hours,
   enabled = true,
+  pollIntervalMs = 5000,
 }: UseTelemetryOptions) {
-  const [livePoints, setLivePoints] = useState<TelemetryPoint[]>([])
-  const [mockStatus, setMockStatus] = useState<'connecting' | 'open' | 'closed'>('closed')
-  const mockTimer = useRef<number | null>(null)
+  const [points, setPoints] = useState<TelemetryPoint[]>([])
+  const [status, setStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('closed')
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const lastAbs = useRef<{ recv: number; sent: number; at: number } | null>(null)
 
-  const historyQuery = useQuery({
-    queryKey: ['telemetry', hostId, hours],
-    enabled: Boolean(hostId) && enabled,
-    queryFn: async () => {
-      if (!hostId) return []
-      const res = await telemetryApi.history(hostId, rangeIso(hours))
-      return res.points
-    },
-  })
+  const poll = useCallback(async () => {
+    if (!hostId) return
+    try {
+      const snap = await telemetryApi.get(hostId)
+      const now = Date.now()
+      let netRx = 0
+      let netTx = 0
+      if (
+        lastAbs.current &&
+        snap.net_bytes_recv != null &&
+        snap.net_bytes_sent != null
+      ) {
+        const dt = Math.max(0.5, (now - lastAbs.current.at) / 1000)
+        netRx = Math.max(
+          0,
+          ((snap.net_bytes_recv - lastAbs.current.recv) * 8) / dt / 1_000_000,
+        )
+        netTx = Math.max(
+          0,
+          ((snap.net_bytes_sent - lastAbs.current.sent) * 8) / dt / 1_000_000,
+        )
+      }
+      if (snap.net_bytes_recv != null && snap.net_bytes_sent != null) {
+        lastAbs.current = {
+          recv: snap.net_bytes_recv,
+          sent: snap.net_bytes_sent,
+          at: now,
+        }
+      }
 
-  useEffect(() => {
-    if (historyQuery.data) {
-      setLivePoints(historyQuery.data)
+      const point: TelemetryPoint = {
+        timestamp: snap.collected_at ?? new Date().toISOString(),
+        cpu_percent: snap.cpu_percent ?? 0,
+        ram_percent: snap.ram_percent ?? 0,
+        net_rx_mbps: netRx,
+        net_tx_mbps: netTx,
+        uptime_seconds: snap.uptime_seconds ?? 0,
+      }
+
+      setPoints((prev) => [...prev.slice(-120), point])
+      setStatus('open')
+      setError(null)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setStatus('closed')
+        setError('No telemetry yet — waiting for agent')
+        return
+      }
+      setStatus('error')
+      setError(err instanceof ApiError ? err.message : 'Telemetry poll failed')
     }
-  }, [historyQuery.data])
+  }, [hostId])
 
-  // Mock live stream when MSW is on (no real WS server)
   useEffect(() => {
-    if (!USE_MSW || !hostId || !enabled) {
-      setMockStatus('closed')
+    lastAbs.current = null
+    setPoints([])
+    setError(null)
+
+    if (!hostId || !enabled) {
+      setStatus('closed')
       return
     }
-    setMockStatus('connecting')
-    const start = window.setTimeout(() => setMockStatus('open'), 200)
-    mockTimer.current = window.setInterval(() => {
-      const point = db.livePoint(hostId)
-      if (point) {
-        setLivePoints((prev) => [...prev.slice(-400), point])
-      }
-    }, 5000)
-    return () => {
-      window.clearTimeout(start)
-      if (mockTimer.current) window.clearInterval(mockTimer.current)
-      setMockStatus('closed')
-    }
-  }, [hostId, enabled])
 
-  const token = sessionStorage.getItem(TOKEN_STORAGE_KEY)
-  const wsUrl =
-    !USE_MSW && hostId && token
-      ? `${import.meta.env.VITE_WS_URL ?? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`}/telemetry?host_id=${hostId}&token=${encodeURIComponent(token)}`
-      : null
+    setStatus('connecting')
+    setIsLoading(true)
+    void poll().finally(() => setIsLoading(false))
 
-  const onMessage = useCallback((event: MessageEvent) => {
-    try {
-      const data = JSON.parse(String(event.data)) as TelemetryPoint & { host_id?: string }
-      setLivePoints((prev) => [...prev.slice(-400), data])
-    } catch {
-      // ignore malformed
-    }
-  }, [])
+    const id = window.setInterval(() => {
+      void poll()
+    }, pollIntervalMs)
 
-  const realWs = useWebSocket({
-    url: wsUrl,
-    enabled: Boolean(wsUrl) && enabled,
-    onMessage,
-  })
-
-  const status = USE_MSW ? mockStatus : realWs.status
-  const reconnect = USE_MSW
-    ? () => {
-        /* mock always live */
-      }
-    : realWs.reconnect
+    return () => window.clearInterval(id)
+  }, [hostId, enabled, pollIntervalMs, poll])
 
   return {
-    points: livePoints,
+    points,
     status,
-    reconnect,
-    isLoading: historyQuery.isLoading,
-    error: historyQuery.error,
+    reconnect: () => {
+      void poll()
+    },
+    isLoading,
+    error,
   }
 }

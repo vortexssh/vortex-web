@@ -11,7 +11,28 @@ import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Table } from '@/components/ui/Table'
 import { Toggle } from '@/components/ui/Toggle'
-import { toast } from '@/components/ui/Toast'
+import { toast, toastCopy } from '@/components/ui/Toast'
+import { buildAgentInstallBundle } from '@/features/hosts/agentInstall'
+
+type EnrollState = {
+  host: Host
+  agentId: string
+  secret: string
+  coreUrl: string
+  script: string
+  oneLiner: string
+  binaryBaseUrl?: string
+}
+
+function downloadScript(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/x-shellscript' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export function HostsPage() {
   const qc = useQueryClient()
@@ -22,11 +43,7 @@ export function HostsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all')
   const [proxyFilter, setProxyFilter] = useState<'all' | 'on' | 'off'>('all')
   const [editor, setEditor] = useState<Host | 'new' | null>(null)
-  const [enroll, setEnroll] = useState<{
-    host: Host
-    command: string
-    token: string
-  } | null>(null)
+  const [enroll, setEnroll] = useState<EnrollState | null>(null)
 
   const filtered = useMemo(() => {
     let rows = hostsQuery.data ?? []
@@ -65,13 +82,33 @@ export function HostsPage() {
   })
 
   const enrollMutation = useMutation({
-    mutationFn: (host: Host) => agentsApi.enroll(host.id),
-    onSuccess: (res, host) => {
+    mutationFn: async (host: Host) => {
+      if (host.agent) {
+        const rotated = await agentsApi.rotate(host.id)
+        return { secret: rotated.secret, id: rotated.id, host }
+      }
+      const created = await agentsApi.create(host.id)
+      return { secret: created.secret, id: created.id, host }
+    },
+    onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })
-      setEnroll({ host, command: res.install_command, token: res.enroll_token })
+      const bundle = buildAgentInstallBundle({
+        agentId: res.id,
+        secret: res.secret,
+      })
+      setEnroll({
+        host: res.host,
+        agentId: bundle.agentId,
+        secret: bundle.secret,
+        coreUrl: bundle.coreUrl,
+        script: bundle.script,
+        oneLiner: bundle.oneLiner,
+        binaryBaseUrl: bundle.binaryBaseUrl,
+      })
+      toast('Agent credentials ready — run install on the host', 'success')
     },
     onError: (err: unknown) =>
-      toast(err instanceof ApiError ? err.message : 'Enroll failed', 'error'),
+      toast(err instanceof ApiError ? err.message : 'Agent enroll failed', 'error'),
   })
 
   return (
@@ -187,7 +224,7 @@ export function HostsPage() {
                   className="!text-xs"
                   onClick={() => enrollMutation.mutate(h)}
                 >
-                  Install agent
+                  {h.agent ? 'Rotate agent' : 'Install agent'}
                 </Button>
                 <Button
                   variant="danger"
@@ -214,20 +251,72 @@ export function HostsPage() {
 
       <Modal
         open={Boolean(enroll)}
-        title="Install agent"
+        title="Install Vortex Agent"
         onClose={() => setEnroll(null)}
         footer={<Button onClick={() => setEnroll(null)}>Done</Button>}
       >
         {enroll ? (
           <div className="flex flex-col gap-3 text-sm text-dim">
             <p>
-              One-time enroll token for <span className="text-neon">{enroll.host.name}</span>. Copy
-              the command onto the target server (outbound WSS only).
+              One-time secret for <span className="text-neon">{enroll.host.name}</span>. Run the
+              script on the server — it uses a shared binary and writes this host&apos;s binding
+              into <span className="font-mono text-muted">/etc/vortex-agent.env</span>. Core only
+              keeps a hash.
             </p>
-            <pre className="overflow-x-auto rounded-md border border-border bg-void p-3 font-mono text-[11px] text-neon whitespace-pre-wrap">
-              {enroll.command}
-            </pre>
-            <p className="font-mono text-[11px] text-muted">token · {enroll.token}</p>
+
+            <div className="rounded-md border border-border bg-void p-3 font-mono text-[11px] text-muted">
+              <div>core · {enroll.coreUrl}</div>
+              <div>agent_id · {enroll.agentId}</div>
+              <div>secret · {enroll.secret}</div>
+              <div>
+                binary ·{' '}
+                {enroll.binaryBaseUrl
+                  ? enroll.binaryBaseUrl
+                  : 'not set (VITE_AGENT_BINARY_BASE_URL) — place binary at /usr/local/bin/vortex-agent'}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 text-xs uppercase tracking-wider text-muted">
+                Paste on the server
+              </div>
+              <pre className="overflow-x-auto rounded-md border border-border bg-void p-3 font-mono text-[11px] text-neon whitespace-pre-wrap break-all">
+                {enroll.oneLiner}
+              </pre>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  className="!text-xs"
+                  onClick={() => {
+                    void toastCopy(enroll.oneLiner, 'Install one-liner copied')
+                  }}
+                >
+                  Copy one-liner
+                </Button>
+                <Button
+                  variant="outline"
+                  className="!text-xs"
+                  onClick={() => {
+                    void toastCopy(enroll.script, 'install.sh copied')
+                  }}
+                >
+                  Copy full script
+                </Button>
+                <Button
+                  variant="outline"
+                  className="!text-xs"
+                  onClick={() => {
+                    downloadScript(
+                      `vortex-agent-install-${enroll.host.name.replace(/\s+/g, '-')}.sh`,
+                      enroll.script,
+                    )
+                    toast('install.sh downloaded', 'success')
+                  }}
+                >
+                  Download install.sh
+                </Button>
+              </div>
+            </div>
           </div>
         ) : null}
       </Modal>
@@ -261,11 +350,35 @@ function HostEditorModal({
         ip_address: ip.trim() ? ip.trim() : null,
         port: Number(port),
         username,
-        is_proxy_enabled: proxy,
-        tag_ids: tagIds,
+        ...(host ? {} : { is_proxy_enabled: proxy }),
       }
-      if (host) return hostsApi.update(host.id, payload)
-      return hostsApi.create(payload)
+
+      let saved: Host
+      if (host) {
+        saved = await hostsApi.update(host.id, {
+          name: payload.name,
+          ip_address: payload.ip_address,
+          port: payload.port,
+          username: payload.username,
+        })
+        if (proxy !== host.is_proxy_enabled) {
+          saved = await hostsApi.setProxy(host.id, proxy)
+        }
+        const current = new Set(host.tags.map((t) => t.id))
+        const next = new Set(tagIds)
+        for (const id of next) {
+          if (!current.has(id)) saved = await hostsApi.attachTag(host.id, id)
+        }
+        for (const id of current) {
+          if (!next.has(id)) saved = await hostsApi.detachTag(host.id, id)
+        }
+      } else {
+        saved = await hostsApi.create(payload)
+        for (const id of tagIds) {
+          saved = await hostsApi.attachTag(saved.id, id)
+        }
+      }
+      return saved
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })

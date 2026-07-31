@@ -10,6 +10,10 @@ export const tagsApi = {
     return apiRequest<Tag>('/tags', { method: 'POST', body: payload })
   },
 
+  update(id: string, payload: { name?: string; color?: string }): Promise<Tag> {
+    return apiRequest<Tag>(`/tags/${id}`, { method: 'PATCH', body: payload })
+  },
+
   remove(id: string): Promise<void> {
     return apiRequest<void>(`/tags/${id}`, { method: 'DELETE' })
   },

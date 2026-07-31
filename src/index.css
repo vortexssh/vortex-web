@@ -79,3 +79,14 @@
     box-shadow: 0 0 0 1px rgb(57 255 20 / 0.4), var(--shadow-glow-sm);
   }
 }
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

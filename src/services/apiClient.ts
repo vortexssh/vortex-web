@@ -3,13 +3,13 @@ import type { ApiErrorBody } from '@/types'
 
 export class ApiError extends Error {
   readonly status: number
-  readonly code?: string
+  readonly code: string
 
-  constructor(status: number, body: ApiErrorBody) {
-    super(body.detail)
+  constructor(status: number, code: string, message: string) {
+    super(message)
     this.name = 'ApiError'
     this.status = status
-    this.code = body.code
+    this.code = code
   }
 }
 
@@ -28,6 +28,30 @@ export function setStoredToken(token: string | null): void {
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
   auth?: boolean
+}
+
+function parseError(status: number, data: unknown, fallback: string): ApiError {
+  if (
+    data &&
+    typeof data === 'object' &&
+    'error' in data &&
+    data.error &&
+    typeof data.error === 'object'
+  ) {
+    const err = (data as ApiErrorBody).error
+    return new ApiError(status, err.code || 'http_error', err.message || fallback)
+  }
+  if (data && typeof data === 'object' && 'detail' in data) {
+    const detail = (data as { detail: unknown }).detail
+    if (typeof detail === 'string') {
+      return new ApiError(status, 'http_error', detail)
+    }
+    if (detail && typeof detail === 'object' && 'message' in detail) {
+      const d = detail as { code?: string; message: string }
+      return new ApiError(status, d.code ?? 'http_error', d.message)
+    }
+  }
+  return new ApiError(status, 'http_error', fallback)
 }
 
 export async function apiRequest<T>(
@@ -59,14 +83,17 @@ export async function apiRequest<T>(
   }
 
   const text = await response.text()
-  const data: unknown = text ? JSON.parse(text) : null
+  let data: unknown = null
+  if (text) {
+    try {
+      data = JSON.parse(text) as unknown
+    } catch {
+      data = text
+    }
+  }
 
   if (!response.ok) {
-    const errBody =
-      data && typeof data === 'object' && 'detail' in data
-        ? (data as ApiErrorBody)
-        : { detail: response.statusText || 'Request failed' }
-    throw new ApiError(response.status, errBody)
+    throw parseError(response.status, data, response.statusText || 'Request failed')
   }
 
   return data as T

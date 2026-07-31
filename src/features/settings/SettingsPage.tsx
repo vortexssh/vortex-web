@@ -14,8 +14,7 @@ import { toast } from '@/components/ui/Toast'
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user)
   const setUser = useAuthStore((s) => s.setUser)
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
+  const [email, setEmail] = useState(user?.email ?? '')
   const [disableCode, setDisableCode] = useState('')
   const [newKeyName, setNewKeyName] = useState('')
   const [rawKey, setRawKey] = useState<string | null>(null)
@@ -23,16 +22,11 @@ export function SettingsPage() {
 
   const keysQuery = useQuery({ queryKey: ['api-keys'], queryFn: () => apiKeysApi.list() })
 
-  const passwordMutation = useMutation({
-    mutationFn: () =>
-      authApi.changePassword({
-        current_password: currentPassword,
-        new_password: newPassword,
-      }),
-    onSuccess: () => {
-      setCurrentPassword('')
-      setNewPassword('')
-      toast('Password updated', 'success')
+  const profileMutation = useMutation({
+    mutationFn: () => authApi.updateMe({ email }),
+    onSuccess: (u) => {
+      setUser(u)
+      toast('Profile updated', 'success')
     },
     onError: (err: unknown) =>
       toast(err instanceof ApiError ? err.message : 'Update failed', 'error'),
@@ -54,9 +48,11 @@ export function SettingsPage() {
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ['api-keys'] })
       setNewKeyName('')
-      setRawKey(res.raw_key)
+      setRawKey(res.key)
       toast('API key created', 'success')
     },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Create failed', 'error'),
   })
 
   const deleteKeyMutation = useMutation({
@@ -67,47 +63,30 @@ export function SettingsPage() {
     },
   })
 
-  function onPassword(e: FormEvent) {
+  function onProfile(e: FormEvent) {
     e.preventDefault()
-    passwordMutation.mutate()
+    profileMutation.mutate()
   }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <section className="rounded-lg border border-border bg-panel p-4">
-        <h2 className="font-mono text-xs uppercase tracking-wider text-muted">Profile</h2>
-        <p className="mt-2 text-sm text-white">{user?.email}</p>
-        <div className="mt-2">
-          <Badge tone={user?.is_2fa_enabled ? 'neon' : 'warn'}>
-            2FA {user?.is_2fa_enabled ? 'enabled' : 'disabled'}
-          </Badge>
-        </div>
-      </section>
-
-      <section className="rounded-lg border border-border bg-panel p-4">
-        <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
-          Change password
-        </h2>
-        <form className="flex flex-col gap-3" onSubmit={onPassword}>
+        <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">Profile</h2>
+        <form className="flex flex-col gap-3" onSubmit={onProfile}>
           <Input
-            label="Current password"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
-            autoComplete="current-password"
           />
-          <Input
-            label="New password"
-            type="password"
-            minLength={8}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            autoComplete="new-password"
-          />
-          <Button type="submit" disabled={passwordMutation.isPending}>
-            Update password
+          <div>
+            <Badge tone={user?.is_2fa_enabled ? 'neon' : 'warn'}>
+              2FA {user?.is_2fa_enabled ? 'enabled' : 'disabled'}
+            </Badge>
+          </div>
+          <Button type="submit" disabled={profileMutation.isPending}>
+            Save profile
           </Button>
         </form>
       </section>
@@ -126,11 +105,11 @@ export function SettingsPage() {
               placeholder="6-digit code"
               value={disableCode}
               onChange={(e) => setDisableCode(e.target.value)}
-              maxLength={6}
+              maxLength={8}
             />
             <Button
               variant="danger"
-              disabled={disableCode.length !== 6}
+              disabled={disableCode.length < 6}
               onClick={() => disable2faMutation.mutate()}
             >
               Disable
@@ -149,10 +128,7 @@ export function SettingsPage() {
             value={newKeyName}
             onChange={(e) => setNewKeyName(e.target.value)}
           />
-          <Button
-            disabled={!newKeyName.trim()}
-            onClick={() => createKeyMutation.mutate()}
-          >
+          <Button disabled={!newKeyName.trim()} onClick={() => createKeyMutation.mutate()}>
             Create key
           </Button>
         </div>

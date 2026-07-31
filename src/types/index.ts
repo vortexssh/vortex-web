@@ -2,23 +2,27 @@ export interface User {
   id: string
   email: string
   is_2fa_enabled: boolean
+  is_active: boolean
   created_at: string
 }
 
 export interface ApiKey {
   id: string
-  user_id: string
   name: string
   key_prefix: string
   expires_at: string | null
   created_at: string
 }
 
+export interface ApiKeyCreated extends ApiKey {
+  key: string
+}
+
 export interface Tag {
   id: string
-  user_id: string
   name: string
   color: string
+  created_at?: string
 }
 
 export interface Agent {
@@ -27,11 +31,25 @@ export interface Agent {
   version: string | null
   is_online: boolean
   last_seen_at: string | null
+  created_at?: string
+}
+
+export interface AgentCreated {
+  id: string
+  host_id: string
+  secret: string
+  version: string | null
+  is_online: boolean
+}
+
+export interface AgentRotateResponse {
+  id: string
+  host_id: string
+  secret: string
 }
 
 export interface Host {
   id: string
-  user_id: string
   name: string
   ip_address: string | null
   port: number
@@ -40,6 +58,7 @@ export interface Host {
   tags: Tag[]
   agent: Agent | null
   created_at: string
+  updated_at: string
 }
 
 export interface CreateHostPayload {
@@ -48,7 +67,6 @@ export interface CreateHostPayload {
   port: number
   username: string
   is_proxy_enabled?: boolean
-  tag_ids?: string[]
 }
 
 export interface UpdateHostPayload {
@@ -56,10 +74,22 @@ export interface UpdateHostPayload {
   ip_address?: string | null
   port?: number
   username?: string
-  is_proxy_enabled?: boolean
-  tag_ids?: string[]
 }
 
+/** Latest telemetry snapshot from Redis (TTL-backed). */
+export interface TelemetrySnapshot {
+  host_id: string
+  cpu_percent: number | null
+  ram_percent: number | null
+  ram_used_bytes: number | null
+  ram_total_bytes: number | null
+  net_bytes_sent: number | null
+  net_bytes_recv: number | null
+  uptime_seconds: number | null
+  collected_at: string | null
+}
+
+/** Chart-friendly point derived from polled snapshots. */
 export interface TelemetryPoint {
   timestamp: string
   cpu_percent: number
@@ -67,11 +97,6 @@ export interface TelemetryPoint {
   net_rx_mbps: number
   net_tx_mbps: number
   uptime_seconds: number
-}
-
-export interface HostTelemetry {
-  host_id: string
-  points: TelemetryPoint[]
 }
 
 export type TaskLogStatus = 'SUCCESS' | 'FAILED' | 'TIMEOUT'
@@ -84,6 +109,7 @@ export interface Task {
   cron_expr: string | null
   is_active: boolean
   created_at: string
+  updated_at: string
 }
 
 export interface TaskLog {
@@ -91,13 +117,12 @@ export interface TaskLog {
   task_id: string
   executed_at: string
   status: TaskLogStatus
-  exit_code: number
-  stdout: string
-  stderr: string
+  exit_code: number | null
+  stdout: string | null
+  stderr: string | null
 }
 
 export interface CreateTaskPayload {
-  host_id: string
   name: string
   command: string
   cron_expr?: string | null
@@ -113,12 +138,7 @@ export interface UpdateTaskPayload {
 
 export interface AuthTokens {
   access_token: string
-  token_type: 'bearer'
-}
-
-export interface LoginResponse extends AuthTokens {
-  user: User
-  requires_2fa: boolean
+  token_type: string
 }
 
 export interface TotpSetupResponse {
@@ -126,16 +146,10 @@ export interface TotpSetupResponse {
   otpauth_uri: string
 }
 
-export interface AgentEnrollResponse {
-  agent_id: string
-  enroll_token: string
-  install_command: string
-}
-
 export interface ApiErrorBody {
-  detail: string
-  code?: string
+  error: {
+    code: string
+    message: string
+    details?: unknown
+  }
 }
-
-/** @deprecated Use User */
-export type UserProfile = User & { display_name?: string }

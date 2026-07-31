@@ -1,15 +1,26 @@
 /**
- * Phase 7 integration checklist (Vortex Core)
+ * Vortex Core integration map (live API).
  *
- * 1. Align OpenAPI with src/types and src/services/*
- * 2. Set VITE_USE_MSW=false
- * 3. Confirm JWT: Bearer header vs httpOnly cookie (update apiClient)
- * 4. Smoke: login → 2FA → host CRUD → telemetry WS → terminal pty → task run
- * 5. Verify field names: ip_address, is_proxy_enabled, cron_expr
+ * REST base: /api/v1
+ * Auth: Authorization: Bearer <jwt>
+ * Errors: { error: { code, message, details? } }
+ *
+ * Boot Core:
+ *   cd ../VortexCore && docker compose up -d
+ *   source .venv/bin/activate && alembic upgrade head
+ *   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+ *
+ * Smoke:
+ *   register → login → /users/me → 2FA setup/verify → hosts → agents → telemetry poll → /ws/pty
  */
 
-export const CORE_INTEGRATION_NOTES = {
-  restBase: '/api',
-  wsTelemetry: '/ws/telemetry',
-  wsTerminal: '/ws/terminal/:hostId',
+export const CORE_ROUTES = {
+  health: '/api/v1/health',
+  authRegister: '/api/v1/auth/register',
+  authLogin: '/api/v1/auth/login',
+  me: '/api/v1/users/me',
+  totpSetup: '/api/v1/auth/2fa/setup',
+  wsPty: '/ws/pty/{host_id}',
+  wsProxy: '/ws/proxy/{host_id}',
+  wsAgent: '/ws/agent',
 } as const

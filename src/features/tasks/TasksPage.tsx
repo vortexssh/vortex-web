@@ -14,8 +14,15 @@ import { toast } from '@/components/ui/Toast'
 
 export function TasksPage() {
   const qc = useQueryClient()
-  const tasksQuery = useQuery({ queryKey: ['tasks'], queryFn: () => tasksApi.list() })
   const hostsQuery = useQuery({ queryKey: ['hosts'], queryFn: () => hostsApi.list() })
+  const hostIds = (hostsQuery.data ?? []).map((h) => h.id)
+
+  const tasksQuery = useQuery({
+    queryKey: ['tasks', hostIds],
+    enabled: hostIds.length > 0,
+    queryFn: () => tasksApi.listAll(hostIds),
+  })
+
   const hostsById = useMemo(() => {
     const map = new Map<string, string>()
     for (const h of hostsQuery.data ?? []) map.set(h.id, h.name)
@@ -35,9 +42,9 @@ export function TasksPage() {
 
   const runMutation = useMutation({
     mutationFn: (id: string) => tasksApi.run(id),
-    onSuccess: (log) => {
-      void qc.invalidateQueries({ queryKey: ['task-logs', log.task_id] })
-      toast(`Run finished · ${log.status}`, log.status === 'SUCCESS' ? 'success' : 'error')
+    onSuccess: (task) => {
+      void qc.invalidateQueries({ queryKey: ['task-logs', task.id] })
+      toast('Task dispatched to agent', 'success')
     },
     onError: (err: unknown) =>
       toast(err instanceof ApiError ? err.message : 'Run failed', 'error'),
@@ -47,7 +54,9 @@ export function TasksPage() {
     <div className="mx-auto flex max-w-7xl flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-dim">Cron and one-shot scripts executed by the host agent.</p>
-        <Button onClick={() => setEditor('new')}>+ New task</Button>
+        <Button onClick={() => setEditor('new')} disabled={(hostsQuery.data ?? []).length === 0}>
+          + New task
+        </Button>
       </div>
 
       <Table
@@ -71,15 +80,15 @@ export function TasksPage() {
             key: 'schedule',
             header: 'Schedule',
             render: (t) => (
-              <span className="font-mono text-xs text-dim">
-                {t.cron_expr ?? 'one-shot'}
-              </span>
+              <span className="font-mono text-xs text-dim">{t.cron_expr ?? 'one-shot'}</span>
             ),
           },
           {
             key: 'active',
             header: 'Active',
-            render: (t) => <Badge tone={t.is_active ? 'neon' : 'muted'}>{t.is_active ? 'yes' : 'no'}</Badge>,
+            render: (t) => (
+              <Badge tone={t.is_active ? 'neon' : 'muted'}>{t.is_active ? 'yes' : 'no'}</Badge>
+            ),
           },
           {
             key: 'cmd',
@@ -131,9 +140,7 @@ export function TasksPage() {
         />
       ) : null}
 
-      {logsTask ? (
-        <LogsModal task={logsTask} onClose={() => setLogsTask(null)} />
-      ) : null}
+      {logsTask ? <LogsModal task={logsTask} onClose={() => setLogsTask(null)} /> : null}
     </div>
   )
 }
@@ -167,8 +174,7 @@ function TaskEditorModal({
           is_active: active,
         })
       }
-      return tasksApi.create({
-        host_id: hostId,
+      return tasksApi.create(hostId, {
         name,
         command,
         cron_expr: cron.trim() ? cron.trim() : null,
@@ -225,7 +231,9 @@ function TaskEditorModal({
           </label>
         ) : null}
         {host && !host.agent?.is_online ? (
-          <p className="text-xs text-warn">Warning: agent is offline — runs will fail until it reconnects.</p>
+          <p className="text-xs text-warn">
+            Warning: agent is offline — runs will fail until it reconnects.
+          </p>
         ) : null}
         <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
         <label className="flex flex-col gap-1.5 text-sm">
@@ -283,7 +291,7 @@ function LogsModal({ task, onClose }: { task: Task; onClose: () => void }) {
                           : 'danger'
                     }
                   >
-                    {log.status} · {log.exit_code}
+                    {log.status} · {log.exit_code ?? '—'}
                   </Badge>
                 </button>
               </li>

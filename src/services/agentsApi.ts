@@ -1,15 +1,22 @@
 import { apiRequest } from './apiClient'
-import type { Agent, AgentEnrollResponse } from '@/types'
+import type { Agent, AgentCreated, AgentRotateResponse } from '@/types'
 
 export const agentsApi = {
-  list(): Promise<Agent[]> {
-    return apiRequest<Agent[]>('/agents')
+  get(hostId: string): Promise<Agent> {
+    return apiRequest<Agent>(`/hosts/${hostId}/agents`)
   },
 
-  enroll(hostId: string): Promise<AgentEnrollResponse> {
-    return apiRequest<AgentEnrollResponse>('/agents/enroll', {
+  create(hostId: string): Promise<AgentCreated> {
+    return apiRequest<AgentCreated>(`/hosts/${hostId}/agents`, { method: 'POST' })
+  },
+
+  rotate(hostId: string): Promise<AgentRotateResponse> {
+    return apiRequest<AgentRotateResponse>(`/hosts/${hostId}/agents/rotate`, {
       method: 'POST',
-      body: { host_id: hostId },
     })
+  },
+
+  revoke(hostId: string): Promise<void> {
+    return apiRequest<void>(`/hosts/${hostId}/agents`, { method: 'DELETE' })
   },
 }

@@ -2,8 +2,11 @@ import { apiRequest } from './apiClient'
 import type { CreateHostPayload, Host, UpdateHostPayload } from '@/types'
 
 export const hostsApi = {
-  list(): Promise<Host[]> {
-    return apiRequest<Host[]>('/hosts')
+  list(params?: { tag_id?: string }): Promise<Host[]> {
+    const q = new URLSearchParams()
+    if (params?.tag_id) q.set('tag_id', params.tag_id)
+    const suffix = q.size ? `?${q}` : ''
+    return apiRequest<Host[]>(`/hosts${suffix}`)
   },
 
   get(id: string): Promise<Host> {
@@ -29,10 +32,11 @@ export const hostsApi = {
     })
   },
 
-  setTags(id: string, tag_ids: string[]): Promise<Host> {
-    return apiRequest<Host>(`/hosts/${id}/tags`, {
-      method: 'PUT',
-      body: { tag_ids },
-    })
+  attachTag(hostId: string, tagId: string): Promise<Host> {
+    return apiRequest<Host>(`/hosts/${hostId}/tags/${tagId}`, { method: 'POST' })
+  },
+
+  detachTag(hostId: string, tagId: string): Promise<Host> {
+    return apiRequest<Host>(`/hosts/${hostId}/tags/${tagId}`, { method: 'DELETE' })
   },
 }

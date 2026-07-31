@@ -18,12 +18,8 @@ export function TopBar({ title, subtitle, menuSlot }: TopBarProps) {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
-  async function logout() {
-    try {
-      await authApi.logout()
-    } catch {
-      // still clear local session
-    }
+  function logout() {
+    authApi.logout()
     clearSession()
     qc.clear()
     navigate('/login')
@@ -68,7 +64,7 @@ export function TopBar({ title, subtitle, menuSlot }: TopBarProps) {
           </span>
         </div>
 
-        <Button variant="ghost" className="!px-2" onClick={() => void logout()} aria-label="Logout">
+        <Button variant="ghost" className="!px-2" onClick={logout} aria-label="Logout">
           <LogOut className="h-4 w-4" />
         </Button>
       </div>

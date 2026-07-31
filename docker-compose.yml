@@ -1,0 +1,14 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.vortex.timant32.ru/api/v1}
+        VITE_WS_URL: ${VITE_WS_URL:-wss://api.vortex.timant32.ru/ws}
+        VITE_AGENT_CORE_URL: ${VITE_AGENT_CORE_URL:-wss://api.vortex.timant32.ru}
+        VITE_AGENT_BINARY_BASE_URL: ${VITE_AGENT_BINARY_BASE_URL:-}
+        VITE_USE_MSW: "false"
+    image: vortex-web:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80"

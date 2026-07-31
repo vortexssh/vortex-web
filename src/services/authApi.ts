@@ -1,49 +1,38 @@
 import { apiRequest, setStoredToken } from './apiClient'
-import type {
-  AuthTokens,
-  LoginResponse,
-  TotpSetupResponse,
-  User,
-} from '@/types'
+import type { AuthTokens, TotpSetupResponse, User } from '@/types'
 
 export interface Credentials {
   email: string
   password: string
 }
 
+export interface LoginPayload extends Credentials {
+  totp_code?: string
+}
+
 export const authApi = {
-  register(payload: Credentials): Promise<LoginResponse> {
-    return apiRequest<LoginResponse>('/auth/register', {
+  register(payload: Credentials): Promise<User> {
+    return apiRequest<User>('/auth/register', {
       method: 'POST',
       body: payload,
       auth: false,
     })
   },
 
-  login(payload: Credentials): Promise<LoginResponse> {
-    return apiRequest<LoginResponse>('/auth/login', {
+  login(payload: LoginPayload): Promise<AuthTokens> {
+    return apiRequest<AuthTokens>('/auth/login', {
       method: 'POST',
       body: payload,
       auth: false,
-    })
-  },
-
-  verifyLoginTotp(payload: { email: string; code: string }): Promise<LoginResponse> {
-    return apiRequest<LoginResponse>('/auth/login/2fa', {
-      method: 'POST',
-      body: payload,
-      auth: false,
-    })
-  },
-
-  logout(): Promise<void> {
-    return apiRequest<void>('/auth/logout', { method: 'POST' }).finally(() => {
-      setStoredToken(null)
     })
   },
 
   me(): Promise<User> {
-    return apiRequest<User>('/auth/me')
+    return apiRequest<User>('/users/me')
+  },
+
+  updateMe(payload: { email?: string }): Promise<User> {
+    return apiRequest<User>('/users/me', { method: 'PATCH', body: payload })
   },
 
   setup2fa(): Promise<TotpSetupResponse> {
@@ -64,14 +53,8 @@ export const authApi = {
     })
   },
 
-  changePassword(payload: {
-    current_password: string
-    new_password: string
-  }): Promise<void> {
-    return apiRequest<void>('/auth/password', {
-      method: 'POST',
-      body: payload,
-    })
+  logout(): void {
+    setStoredToken(null)
   },
 
   persistSession(tokens: AuthTokens): void {

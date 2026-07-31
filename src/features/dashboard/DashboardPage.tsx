@@ -21,14 +21,12 @@ export function DashboardPage() {
   const hosts = hostsQuery.data ?? []
   const onlineHosts = hosts.filter((h) => h.agent?.is_online)
   const [hostId, setHostId] = useState<string | null>(null)
-  const [hours, setHours] = useState(6)
 
   const selectedId = hostId ?? onlineHosts[0]?.id ?? hosts[0]?.id ?? null
   const selected = hosts.find((h) => h.id === selectedId) ?? null
 
-  const { points, status, reconnect, isLoading } = useTelemetrySocket({
+  const { points, status, reconnect, isLoading, error } = useTelemetrySocket({
     hostId: selectedId,
-    hours,
     enabled: Boolean(selected?.agent),
   })
 
@@ -39,7 +37,6 @@ export function DashboardPage() {
       total: hosts.length,
       cpu: last?.cpu_percent,
       ram: last?.ram_percent,
-      rx: last?.net_rx_mbps,
       uptime: last?.uptime_seconds ?? 0,
     }
   }, [points, onlineHosts.length, hosts.length])
@@ -53,13 +50,7 @@ export function DashboardPage() {
   if (selected && !selected.agent) {
     return (
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <HostPicker
-          hosts={hosts}
-          selectedId={selectedId}
-          onChange={setHostId}
-          hours={hours}
-          onHours={setHours}
-        />
+        <HostPicker hosts={hosts} selectedId={selectedId} onChange={setHostId} />
         <EmptyState
           title="No agent on this host"
           body="Install the Vortex Agent to stream CPU, RAM, network and uptime."
@@ -70,26 +61,21 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
-      <HostPicker
-        hosts={hosts}
-        selectedId={selectedId}
-        onChange={setHostId}
-        hours={hours}
-        onHours={setHours}
-      />
+      <HostPicker hosts={hosts} selectedId={selectedId} onChange={setHostId} />
 
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={status === 'open' ? 'neon' : status === 'connecting' ? 'warn' : 'danger'}>
-          stream · {status}
+          poll · {status}
         </Badge>
         {status !== 'open' ? (
           <Button variant="outline" className="!text-xs" onClick={reconnect}>
-            Reconnect
+            Retry
           </Button>
         ) : null}
         {selected?.agent && !selected.agent.is_online ? (
           <Badge tone="warn">agent offline</Badge>
         ) : null}
+        {error ? <span className="font-mono text-xs text-warn">{error}</span> : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -112,8 +98,8 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {isLoading ? (
-        <p className="font-mono text-xs text-muted">Loading history…</p>
+      {isLoading && points.length === 0 ? (
+        <p className="font-mono text-xs text-muted">Waiting for telemetry snapshot…</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           <MetricChart title="CPU load" unit="%" dataKey="cpu_percent" points={points} />
@@ -163,14 +149,10 @@ function HostPicker({
   hosts,
   selectedId,
   onChange,
-  hours,
-  onHours,
 }: {
   hosts: { id: string; name: string }[]
   selectedId: string | null
   onChange: (id: string) => void
-  hours: number
-  onHours: (h: number) => void
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -185,18 +167,9 @@ function HostPicker({
           </option>
         ))}
       </select>
-      <div className="flex gap-1">
-        {[1, 6, 24].map((h) => (
-          <Button
-            key={h}
-            variant={hours === h ? 'primary' : 'outline'}
-            className="!text-xs"
-            onClick={() => onHours(h)}
-          >
-            {h}h
-          </Button>
-        ))}
-      </div>
+      <span className="font-mono text-[10px] text-muted">
+        Redis snapshot · poll 5s (Core does not store metric history)
+      </span>
     </div>
   )
 }
