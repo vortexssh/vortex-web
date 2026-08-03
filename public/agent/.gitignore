@@ -1,0 +1,6 @@
+# Agent binaries served at https://<web-host>/agent/vortex-agent-linux-amd64
+# Production: baked by VortexWeb/Dockerfile (agent stage).
+# Local: (cd ../VortexAgent && make publish-web)
+*
+!.gitignore
+!README.md

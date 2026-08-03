@@ -269,10 +269,7 @@ export function HostsPage() {
               <div>agent_id · {enroll.agentId}</div>
               <div>secret · {enroll.secret}</div>
               <div>
-                binary ·{' '}
-                {enroll.binaryBaseUrl
-                  ? enroll.binaryBaseUrl
-                  : 'not set (VITE_AGENT_BINARY_BASE_URL) — place binary at /usr/local/bin/vortex-agent'}
+                binary · {enroll.binaryBaseUrl}/vortex-agent-linux-{'{amd64|arm64}'}
               </div>
             </div>
 
