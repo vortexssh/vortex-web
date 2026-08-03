@@ -3,7 +3,7 @@ services:
     build:
       # Monorepo root so the image can compile VortexAgent into /agent/*.
       context: ..
-      dockerfile: VortexWeb/Dockerfile
+      dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.vortex.timant32.ru/api/v1}
         VITE_WS_URL: ${VITE_WS_URL:-wss://api.vortex.timant32.ru/ws}
