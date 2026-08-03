@@ -3,15 +3,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      additional_contexts:
-        # Local checkout of vortex-agent (private repo — no GitHub clone at build time).
-        vortex-agent: ${VORTEX_AGENT_SRC:-/opt/vortex-agent}
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.vortex.timant32.ru/api/v1}
         VITE_WS_URL: ${VITE_WS_URL:-wss://api.vortex.timant32.ru/ws}
         VITE_AGENT_CORE_URL: ${VITE_AGENT_CORE_URL:-wss://api.vortex.timant32.ru}
         VITE_AGENT_BINARY_BASE_URL: ${VITE_AGENT_BINARY_BASE_URL:-}
         VITE_USE_MSW: "false"
+        # Prebuilt agent binaries from GitHub Releases (not source on the web host).
+        AGENT_REPO: ${AGENT_REPO:-vortexssh/vortex-agent}
+        AGENT_RELEASE: ${AGENT_RELEASE:-latest}
+        AGENT_GIT_TOKEN: ${AGENT_GIT_TOKEN:-}
     image: vortex-web:latest
     restart: unless-stopped
     ports:

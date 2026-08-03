@@ -2,35 +2,45 @@
 
 ## Сервер
 
-- Path: `/opt/vortex-web`
-- Agent source: `/opt/vortex-agent` (нужен для сборки бинарников в образ)
+- Path: `/opt/vortex-web` — **только Web** (исходники агента здесь не нужны)
 - Container: `127.0.0.1:18080` → nginx SPA
 - Domain: `vortex.timant32.ru`
 - API: `api.vortex.timant32.ru`
 
-## Первый запуск / агент рядом
+Агент ставится **бинарем на целевые машины**. Web лишь раздаёт уже собранные
+файлы с `https://vortex.timant32.ru/agent/vortex-agent-linux-*` для one-liner’а.
 
-Репозиторий `vortex-agent` приватный — Docker **не** клонирует его с GitHub.
-Один раз положи исходники рядом (тем же доступом, что и web):
+## Откуда берутся бинарники
+
+При `docker compose build` образ скачивает assets из **GitHub Release** репо
+`vortexssh/vortex-agent` (не клонирует исходники).
+
+1. На машине разработки / в CI один раз:
+   ```bash
+   cd VortexAgent
+   make cross-linux
+   gh release create v0.1.0 \
+     bin/vortex-agent-linux-amd64 \
+     bin/vortex-agent-linux-arm64 \
+     --title v0.1.0 --generate-notes
+   ```
+2. На web-сервере в `/opt/vortex-web/.env` (репо приватное):
+   ```env
+   AGENT_GIT_TOKEN=ghp_xxx   # Contents:read; не коммитить
+   AGENT_RELEASE=latest      # или v0.1.0
+   ```
+3. `docker compose --env-file .env up -d --build`
+
+## Обновление Web
 
 ```bash
-# тем же способом, как клонировал vortex-web (deploy key / credential helper)
-sudo git clone git@github.com:vortexssh/vortex-agent.git /opt/vortex-agent
-# или HTTPS с credential helper
-```
-
-Переопределить путь: в `.env` → `VORTEX_AGENT_SRC=/path/to/vortex-agent`.
-
-## Обновление
-
-```bash
-cd /opt/vortex-agent && sudo git pull
-cd /opt/vortex-web && git pull
+cd /opt/vortex-web
+git pull
 docker compose --env-file .env up -d --build
 ```
 
-Образ сам скомпилирует `vortex-agent-linux-amd64/arm64` и положит в `/agent/`.
-`VITE_AGENT_BINARY_BASE_URL` не нужен — Install agent берёт `https://vortex.timant32.ru/agent`.
+`VITE_AGENT_BINARY_BASE_URL` не обязателен — Install agent подставляет
+`https://vortex.timant32.ru/agent`.
 
 ## CORS на Core
 
@@ -48,5 +58,5 @@ cd /opt/vortex-core && docker compose up -d
 
 ```bash
 curl -sI https://vortex.timant32.ru/agent/vortex-agent-linux-amd64 | head -5
-# 200 + не text/html
+# 200, не text/html
 ```
