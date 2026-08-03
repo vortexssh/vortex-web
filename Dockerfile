@@ -18,14 +18,13 @@ ARG AGENT_GIT_TOKEN=
 RUN apt-get update && apt-get install -y --no-install-recommends make git ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-RUN set -euo pipefail; \
+RUN set -eu; \
   url="${AGENT_GIT_URL}"; \
   if [ -n "${AGENT_GIT_TOKEN}" ]; then \
     url="https://${AGENT_GIT_TOKEN}@github.com/vortexssh/vortex-agent.git"; \
   fi; \
   echo "cloning agent from ${AGENT_GIT_URL}@${AGENT_GIT_REF}"; \
   git clone --depth 1 --branch "${AGENT_GIT_REF}" "${url}" .; \
-  # Strip token from remote if present
   git remote set-url origin "${AGENT_GIT_URL}" 2>/dev/null || true
 
 RUN make cross-linux \
