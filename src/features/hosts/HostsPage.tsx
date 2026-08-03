@@ -83,21 +83,19 @@ export function HostsPage() {
 
   const enrollMutation = useMutation({
     mutationFn: async (host: Host) => {
-      if (host.agent) {
-        const rotated = await agentsApi.rotate(host.id)
-        return { secret: rotated.secret, id: rotated.id, host }
-      }
-      const created = await agentsApi.create(host.id)
-      return { secret: created.secret, id: created.id, host }
-    },
-    onSuccess: (res) => {
-      void qc.invalidateQueries({ queryKey: ['hosts'] })
+      const creds = host.agent
+        ? await agentsApi.rotate(host.id)
+        : await agentsApi.create(host.id)
       const bundle = buildAgentInstallBundle({
-        agentId: res.id,
-        secret: res.secret,
+        agentId: creds.id,
+        secret: creds.secret,
       })
+      return { host, bundle }
+    },
+    onSuccess: ({ host, bundle }) => {
+      void qc.invalidateQueries({ queryKey: ['hosts'] })
       setEnroll({
-        host: res.host,
+        host,
         agentId: bundle.agentId,
         secret: bundle.secret,
         coreUrl: bundle.coreUrl,
@@ -108,7 +106,14 @@ export function HostsPage() {
       toast('Agent credentials ready — run install on the host', 'success')
     },
     onError: (err: unknown) =>
-      toast(err instanceof ApiError ? err.message : 'Agent enroll failed', 'error'),
+      toast(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Agent enroll failed',
+        'error',
+      ),
   })
 
   return (

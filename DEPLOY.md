@@ -2,37 +2,45 @@
 
 ## Сервер
 
-- Path: `/opt/vortex-web` — **только SPA**
-- Container: `127.0.0.1:18080` → nginx
-- Domain: `vortex.timant32.ru`
-- API: `api.vortex.timant32.ru`
+- `/opt/vortex-web` — SPA + volume с бинарниками агента
+- `127.0.0.1:18080` → docker nginx
+- Бинарники: `/opt/vortex-web/agent-bins/` → `https://vortex.timant32.ru/agent/...`
 
-Агент **не** входит в образ Web. Enroll качает бинарник с отдельного URL
-(`VITE_AGENT_BINARY_BASE_URL`) — CDN, GitHub Release assets, свой static host.
+## Собрать агент и выложить
 
-## Сборка
+```bash
+# где есть исходники агента
+cd VortexAgent && make cross-linux
 
-В `/opt/vortex-web/.env`:
+# на сервере с Web
+mkdir -p /opt/vortex-web/agent-bins
+scp bin/vortex-agent-linux-amd64 bin/vortex-agent-linux-arm64 \
+  root@timant32:/opt/vortex-web/agent-bins/
+# или локально на том же хосте:
+# cp bin/vortex-agent-linux-* /opt/vortex-web/agent-bins/
 
-```env
-VITE_API_URL=https://api.vortex.timant32.ru/api/v1
-VITE_WS_URL=wss://api.vortex.timant32.ru/ws
-VITE_AGENT_CORE_URL=wss://api.vortex.timant32.ru
-# Пример: публичный или приватный CDN / Release download base (без trailing slash)
-VITE_AGENT_BINARY_BASE_URL=https://github.com/vortexssh/vortex-agent/releases/download/v0.1.0
+ls -la /opt/vortex-web/agent-bins/
+# ожидается ~6MB на файл, не пустая папка с .gitkeep
 ```
+
+Подтянуть compose (volume `./agent-bins`) и nginx с `location /agent/`:
 
 ```bash
 cd /opt/vortex-web
+# .env: VITE_AGENT_BINARY_BASE_URL=https://vortex.timant32.ru/agent
 git pull
 docker compose --env-file .env up -d --build
 ```
 
-Файлы по адресу должны называться:
-`vortex-agent-linux-amd64`, `vortex-agent-linux-arm64`.
+Проверка — **не** `text/html` и не ~1KB:
 
-Локально для dev: `cd VortexAgent && make publish-web` + Vite, либо
-`VITE_AGENT_BINARY_BASE_URL=http://127.0.0.1:5173/agent`.
+```bash
+curl -sI http://127.0.0.1:18080/agent/vortex-agent-linux-amd64 | head -8
+curl -sI https://vortex.timant32.ru/agent/vortex-agent-linux-amd64 | head -8
+docker compose exec web ls -la /usr/share/nginx/html/agent/
+```
+
+Если снаружи HTML ~931 байт — бинарников нет в volume или контейнер без нового `nginx-spa.conf` (SPA отдаёт `index.html`).
 
 ## CORS на Core
 
