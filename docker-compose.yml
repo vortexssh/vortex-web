@@ -1,16 +1,19 @@
 services:
   web:
     build:
-      # Monorepo root so the image can compile VortexAgent into /agent/*.
-      context: ..
+      context: .
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.vortex.timant32.ru/api/v1}
         VITE_WS_URL: ${VITE_WS_URL:-wss://api.vortex.timant32.ru/ws}
         VITE_AGENT_CORE_URL: ${VITE_AGENT_CORE_URL:-wss://api.vortex.timant32.ru}
-        # Optional override; empty = auto <web-origin>/agent in the browser.
+        # Empty = auto <web-origin>/agent in the browser at Install agent time.
         VITE_AGENT_BINARY_BASE_URL: ${VITE_AGENT_BINARY_BASE_URL:-}
         VITE_USE_MSW: "false"
+        # Auto-build agent binaries into the image (private repo → set AGENT_GIT_TOKEN in .env).
+        AGENT_GIT_URL: ${AGENT_GIT_URL:-https://github.com/vortexssh/vortex-agent.git}
+        AGENT_GIT_REF: ${AGENT_GIT_REF:-master}
+        AGENT_GIT_TOKEN: ${AGENT_GIT_TOKEN:-}
     image: vortex-web:latest
     restart: unless-stopped
     ports:
