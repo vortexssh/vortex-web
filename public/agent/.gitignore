@@ -1,6 +1,5 @@
-# Agent binaries served at https://<web-host>/agent/vortex-agent-linux-amd64
-# Production: baked by VortexWeb/Dockerfile (agent stage).
-# Local: (cd ../VortexAgent && make publish-web)
+# Optional local static mirror for Vite `make publish-web`.
+# Production Web image does not serve these — enroll uses VITE_AGENT_BINARY_BASE_URL.
 *
 !.gitignore
 !README.md

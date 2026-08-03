@@ -1,7 +1,8 @@
 /**
  * Generates a one-shot install script with agent binding credentials.
- * The generic binary is downloaded from Vortex Web `/agent/`;
- * per-host secrets go into /etc/vortex-agent.env only.
+ * The shared binary is downloaded from VITE_AGENT_BINARY_BASE_URL
+ * (CDN / GitHub Release / any static host) — not from the Web SPA image.
+ * Per-host secrets go only into /etc/vortex-agent.env.
  */
 
 export type AgentInstallParams = {
@@ -47,31 +48,31 @@ export function resolveAgentCoreUrl(): string {
 
 /**
  * Where enroll scripts download the shared agent binary from.
- * Defaults to current Vortex Web origin + /agent (auto — no manual env required).
+ * Production: set VITE_AGENT_BINARY_BASE_URL (CDN / Release).
+ * Dev: falls back to Vite-served /agent after `make publish-web`.
  */
 export function resolveAgentBinaryBaseUrl(): string {
   const v = import.meta.env.VITE_AGENT_BINARY_BASE_URL?.trim()
   if (v) return v.replace(/\/$/, '')
 
-  if (typeof window !== 'undefined' && window.location?.origin) {
+  if (import.meta.env.DEV && typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin}/agent`
   }
-
-  // Last resort (should not happen in browser); keep absolute-ish path for debug.
-  return '/agent'
+  return ''
 }
 
 function requireBinaryBaseUrl(raw?: string): string {
   const base = (raw?.trim() || resolveAgentBinaryBaseUrl()).replace(/\/$/, '')
   if (!base || base === '/') {
-    throw new Error('Agent binary base URL is empty — open Vortex Web over http(s) and retry Install agent')
+    throw new Error(
+      'Set VITE_AGENT_BINARY_BASE_URL to an absolute URL hosting vortex-agent-linux-{amd64,arm64}, then rebuild Web',
+    )
   }
-  // Remote hosts cannot resolve relative /agent — require absolute URL in the script.
   if (base.startsWith('/')) {
     if (typeof window !== 'undefined' && window.location?.origin) {
       return `${window.location.origin}${base}`
     }
-    throw new Error('Agent binary URL must be absolute (https://web-host/agent)')
+    throw new Error('Agent binary URL must be absolute (https://cdn.example/agent)')
   }
   return base
 }
@@ -126,7 +127,7 @@ install_binary() {
   if [[ "\${code}" != "200" ]]; then
     rm -f "\${tmp}"
     echo "ERROR: download failed (HTTP \${code}) from \${url}" >&2
-    echo "Vortex Web must serve agent binaries at /agent/ (rebuild Web image with agent stage)." >&2
+    echo "Check VITE_AGENT_BINARY_BASE_URL / that vortex-agent-linux-* are published there." >&2
     exit 1
   fi
   if head -c 16 "\${tmp}" | grep -qi '<!DOCTYPE\\|<html\\|text/html'; then

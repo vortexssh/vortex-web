@@ -7,12 +7,9 @@ services:
         VITE_API_URL: ${VITE_API_URL:-https://api.vortex.timant32.ru/api/v1}
         VITE_WS_URL: ${VITE_WS_URL:-wss://api.vortex.timant32.ru/ws}
         VITE_AGENT_CORE_URL: ${VITE_AGENT_CORE_URL:-wss://api.vortex.timant32.ru}
+        # Where enroll curls the agent binary (CDN / Release assets). Not this image.
         VITE_AGENT_BINARY_BASE_URL: ${VITE_AGENT_BINARY_BASE_URL:-}
         VITE_USE_MSW: "false"
-        # Prebuilt agent binaries from GitHub Releases (not source on the web host).
-        AGENT_REPO: ${AGENT_REPO:-vortexssh/vortex-agent}
-        AGENT_RELEASE: ${AGENT_RELEASE:-latest}
-        AGENT_GIT_TOKEN: ${AGENT_GIT_TOKEN:-}
     image: vortex-web:latest
     restart: unless-stopped
     ports:
