@@ -56,7 +56,7 @@ function HostCard({ host }: { host: PublicHost }) {
             <span className="text-lg leading-none" title={host.country_code ?? undefined}>
               {countryFlag(host.country_code)}
             </span>
-            <h2 className="truncate font-mono text-sm text-white">{host.name}</h2>
+            <h2 className="truncate font-mono text-sm text-fg-strong">{host.name}</h2>
           </div>
         </div>
         <Badge tone={host.agent_online ? 'neon' : 'warn'}>
@@ -96,7 +96,7 @@ export function PublicStatusPage() {
   })
 
   return (
-    <div className="min-h-full bg-void px-4 py-8 text-white">
+    <div className="min-h-full bg-void px-4 py-8 text-fg-strong">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <header className="border-b border-border pb-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">

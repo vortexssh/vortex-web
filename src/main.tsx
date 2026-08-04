@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { USE_MSW } from './config/env'
+import { initTheme } from './store/themeStore'
+
+initTheme()
 
 async function prepare(): Promise<void> {
   if (USE_MSW) {

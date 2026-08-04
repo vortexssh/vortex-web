@@ -130,7 +130,7 @@ export function DashboardPage() {
           {hosts.map((h) => (
             <li key={h.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <div>
-                <div className="flex items-center gap-1.5 text-white">
+                <div className="flex items-center gap-1.5 text-fg-strong">
                   <span className="text-base leading-none">{countryFlag(h.country_code)}</span>
                   <span>{h.name}</span>
                 </div>

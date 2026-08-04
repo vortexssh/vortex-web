@@ -53,6 +53,16 @@ export const authApi = {
     })
   },
 
+  changePassword(payload: {
+    current_password: string
+    new_password: string
+  }): Promise<void> {
+    return apiRequest<void>('/auth/password', {
+      method: 'POST',
+      body: payload,
+    })
+  },
+
   logout(): void {
     setStoredToken(null)
   },

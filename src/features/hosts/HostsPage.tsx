@@ -1,10 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { hostsApi } from '@/services/hostsApi'
 import { tagsApi } from '@/services/tagsApi'
 import { agentsApi } from '@/services/agentsApi'
 import { ApiError } from '@/services/apiClient'
 import type { CreateHostPayload, Host } from '@/types'
+import { useAuthStore } from '@/store/authStore'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -37,8 +39,17 @@ function downloadScript(filename: string, content: string) {
 
 export function HostsPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const is2faEnabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
   const hostsQuery = useQuery({ queryKey: ['hosts'], queryFn: () => hostsApi.list() })
   const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() })
+
+  function require2faForAgent(): boolean {
+    if (is2faEnabled) return true
+    toast('Enable 2FA to install or rotate agents', 'error')
+    navigate('/security/2fa', { state: { from: '/hosts' } })
+    return false
+  }
 
   const [tagFilter, setTagFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all')
@@ -180,7 +191,7 @@ export function HostsPage() {
             header: 'Host',
             render: (h) => (
               <div>
-                <div className="flex items-center gap-1.5 font-medium text-white">
+                <div className="flex items-center gap-1.5 font-medium text-fg-strong">
                   <span className="text-base leading-none" title={h.country_code ?? undefined}>
                     {countryFlag(h.country_code)}
                   </span>
@@ -260,7 +271,10 @@ export function HostsPage() {
                 <Button
                   variant="outline"
                   className="!text-xs"
-                  onClick={() => enrollMutation.mutate(h)}
+                  onClick={() => {
+                    if (!require2faForAgent()) return
+                    enrollMutation.mutate(h)
+                  }}
                 >
                   {h.agent ? 'Rotate agent' : 'Install agent'}
                 </Button>
@@ -484,7 +498,7 @@ function HostEditorModal({
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="text-xs uppercase tracking-wider text-muted">Notes</span>
           <textarea
-            className="min-h-[88px] resize-y rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-white outline-none transition-colors placeholder:text-muted focus:border-neon/50 focus:neon-ring"
+            className="min-h-[88px] resize-y rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong outline-none transition-colors placeholder:text-muted focus:border-neon/50 focus:neon-ring"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Free-form notes for this host…"

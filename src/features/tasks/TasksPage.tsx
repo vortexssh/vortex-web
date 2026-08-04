@@ -69,7 +69,7 @@ export function TasksPage() {
             header: 'Task',
             render: (t) => (
               <div>
-                <div className="text-white">{t.name}</div>
+                <div className="text-fg-strong">{t.name}</div>
                 <div className="font-mono text-[11px] text-muted">
                   {hostsById.get(t.host_id) ?? t.host_id}
                 </div>
@@ -216,7 +216,7 @@ function TaskEditorModal({
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-xs uppercase tracking-wider text-muted">Host</span>
             <select
-              className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-white"
+              className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong"
               value={hostId}
               onChange={(e) => setHostId(e.target.value)}
               required
@@ -239,7 +239,7 @@ function TaskEditorModal({
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="text-xs uppercase tracking-wider text-muted">Command</span>
           <textarea
-            className="min-h-24 rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-white outline-none focus:border-neon/50"
+            className="min-h-24 rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong outline-none focus:border-neon/50"
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             required

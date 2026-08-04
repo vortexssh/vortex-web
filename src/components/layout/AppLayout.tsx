@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { useState } from 'react'
+import { TwoFactorNag } from '@/components/auth/TwoFactorNag'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
@@ -27,7 +28,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   },
   '/settings': {
     title: 'Settings',
-    subtitle: 'Profile · API keys · security',
+    subtitle: 'Profile · security · appearance · API keys',
   },
 }
 
@@ -64,6 +65,7 @@ export function AppLayout() {
             </button>
           }
         />
+        <TwoFactorNag />
         <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
           <Outlet />
         </main>

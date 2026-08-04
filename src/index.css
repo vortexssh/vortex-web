@@ -1,23 +1,178 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-void: #0a0a0a;
-  --color-surface: #111111;
-  --color-panel: #141414;
-  --color-border: #1f1f1f;
-  --color-border-active: #2a2a2a;
-  --color-muted: #6b7280;
-  --color-dim: #9ca3af;
-  --color-neon: #39ff14;
-  --color-neon-dim: #22c55e;
-  --color-danger: #ff3366;
-  --color-warn: #fbbf24;
+  --color-void: var(--vx-void);
+  --color-surface: var(--vx-surface);
+  --color-panel: var(--vx-panel);
+  --color-border: var(--vx-border);
+  --color-border-active: var(--vx-border-active);
+  --color-muted: var(--vx-muted);
+  --color-dim: var(--vx-dim);
+  --color-neon: var(--vx-neon);
+  --color-neon-dim: var(--vx-neon-dim);
+  --color-danger: var(--vx-danger);
+  --color-warn: var(--vx-warn);
+  --color-fg: var(--vx-fg);
+  --color-fg-strong: var(--vx-fg-strong);
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: var(--vx-font-sans);
+  --font-mono: var(--vx-font-mono);
 
-  --shadow-glow: 0 0 12px rgb(57 255 20 / 0.35);
-  --shadow-glow-sm: 0 0 6px rgb(57 255 20 / 0.25);
+  --shadow-glow: var(--vx-shadow-glow);
+  --shadow-glow-sm: var(--vx-shadow-glow-sm);
+  --radius-panel: var(--vx-radius);
+}
+
+/* Default / Matrix */
+:root,
+[data-theme='matrix'] {
+  --vx-void: #0a0a0a;
+  --vx-surface: #111111;
+  --vx-panel: #141414;
+  --vx-border: #1f1f1f;
+  --vx-border-active: #2a2a2a;
+  --vx-muted: #6b7280;
+  --vx-dim: #9ca3af;
+  --vx-neon: #39ff14;
+  --vx-neon-dim: #22c55e;
+  --vx-danger: #ff3366;
+  --vx-warn: #fbbf24;
+  --vx-fg: #e5e7eb;
+  --vx-fg-strong: #ffffff;
+  --vx-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --vx-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --vx-shadow-glow: 0 0 12px rgb(57 255 20 / 0.35);
+  --vx-shadow-glow-sm: 0 0 6px rgb(57 255 20 / 0.25);
+  --vx-radius: 0.5rem;
+  --vx-glow-text: 0 0 8px rgb(57 255 20 / 0.55);
+  --vx-selection: rgb(57 255 20 / 0.25);
+  --vx-scrollbar: #2a2a2a;
+  --vx-scrollbar-hover: #3a3a3a;
+}
+
+[data-theme='amber'] {
+  --vx-void: #0c0a06;
+  --vx-surface: #14100a;
+  --vx-panel: #1a140c;
+  --vx-border: #2a2114;
+  --vx-border-active: #3d301c;
+  --vx-muted: #8a7350;
+  --vx-dim: #c4a574;
+  --vx-neon: #ffb000;
+  --vx-neon-dim: #d97706;
+  --vx-danger: #ff4d4d;
+  --vx-warn: #fcd34d;
+  --vx-fg: #f5e6c8;
+  --vx-fg-strong: #fff7e6;
+  --vx-font-sans: 'IBM Plex Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --vx-font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --vx-shadow-glow: 0 0 14px rgb(255 176 0 / 0.28);
+  --vx-shadow-glow-sm: 0 0 6px rgb(255 176 0 / 0.2);
+  --vx-radius: 0.25rem;
+  --vx-glow-text: 0 0 10px rgb(255 176 0 / 0.45);
+  --vx-selection: rgb(255 176 0 / 0.28);
+  --vx-scrollbar: #3d301c;
+  --vx-scrollbar-hover: #554228;
+}
+
+[data-theme='arctic'] {
+  --vx-void: #070b10;
+  --vx-surface: #0c121a;
+  --vx-panel: #101820;
+  --vx-border: #1c2836;
+  --vx-border-active: #2a3b4f;
+  --vx-muted: #64748b;
+  --vx-dim: #94a3b8;
+  --vx-neon: #38bdf8;
+  --vx-neon-dim: #0ea5e9;
+  --vx-danger: #fb7185;
+  --vx-warn: #fbbf24;
+  --vx-fg: #e2e8f0;
+  --vx-fg-strong: #f8fafc;
+  --vx-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --vx-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --vx-shadow-glow: 0 0 12px rgb(56 189 248 / 0.28);
+  --vx-shadow-glow-sm: 0 0 6px rgb(56 189 248 / 0.2);
+  --vx-radius: 0.75rem;
+  --vx-glow-text: 0 0 8px rgb(56 189 248 / 0.4);
+  --vx-selection: rgb(56 189 248 / 0.25);
+  --vx-scrollbar: #2a3b4f;
+  --vx-scrollbar-hover: #3b516a;
+}
+
+[data-theme='crimson'] {
+  --vx-void: #0a0606;
+  --vx-surface: #120a0a;
+  --vx-panel: #180e0e;
+  --vx-border: #2a1418;
+  --vx-border-active: #3d1c24;
+  --vx-muted: #8b5a63;
+  --vx-dim: #c48b94;
+  --vx-neon: #ff3355;
+  --vx-neon-dim: #e11d48;
+  --vx-danger: #ff6680;
+  --vx-warn: #fb923c;
+  --vx-fg: #f1e4e6;
+  --vx-fg-strong: #fff5f7;
+  --vx-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --vx-font-mono: 'Fira Code', 'JetBrains Mono', ui-monospace, monospace;
+  --vx-shadow-glow: 0 0 14px rgb(255 51 85 / 0.35);
+  --vx-shadow-glow-sm: 0 0 6px rgb(255 51 85 / 0.25);
+  --vx-radius: 0.375rem;
+  --vx-glow-text: 0 0 10px rgb(255 51 85 / 0.5);
+  --vx-selection: rgb(255 51 85 / 0.28);
+  --vx-scrollbar: #3d1c24;
+  --vx-scrollbar-hover: #552830;
+}
+
+[data-theme='slate'] {
+  --vx-void: #0f1115;
+  --vx-surface: #151821;
+  --vx-panel: #1a1e28;
+  --vx-border: #2a303c;
+  --vx-border-active: #3a4252;
+  --vx-muted: #6b7280;
+  --vx-dim: #9ca3af;
+  --vx-neon: #94a3b8;
+  --vx-neon-dim: #64748b;
+  --vx-danger: #f87171;
+  --vx-warn: #fbbf24;
+  --vx-fg: #d1d5db;
+  --vx-fg-strong: #f3f4f6;
+  --vx-font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --vx-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --vx-shadow-glow: none;
+  --vx-shadow-glow-sm: none;
+  --vx-radius: 0.5rem;
+  --vx-glow-text: none;
+  --vx-selection: rgb(148 163 184 / 0.3);
+  --vx-scrollbar: #3a4252;
+  --vx-scrollbar-hover: #4b5563;
+}
+
+[data-theme='daybreak'] {
+  --vx-void: #f4f1ea;
+  --vx-surface: #fffcf7;
+  --vx-panel: #ffffff;
+  --vx-border: #e2dcd0;
+  --vx-border-active: #cfc6b6;
+  --vx-muted: #78716c;
+  --vx-dim: #57534e;
+  --vx-neon: #0f766e;
+  --vx-neon-dim: #0d9488;
+  --vx-danger: #dc2626;
+  --vx-warn: #d97706;
+  --vx-fg: #292524;
+  --vx-fg-strong: #1c1917;
+  --vx-font-sans: 'Source Sans 3', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --vx-font-mono: 'Source Code Pro', 'JetBrains Mono', ui-monospace, monospace;
+  --vx-shadow-glow: 0 0 0 1px rgb(15 118 110 / 0.15);
+  --vx-shadow-glow-sm: 0 1px 2px rgb(28 25 23 / 0.08);
+  --vx-radius: 0.625rem;
+  --vx-glow-text: none;
+  --vx-selection: rgb(15 118 110 / 0.2);
+  --vx-scrollbar: #d6d3d1;
+  --vx-scrollbar-hover: #a8a29e;
 }
 
 @layer base {
@@ -35,16 +190,16 @@
 
   body {
     margin: 0;
-    background-color: var(--color-void);
-    color: #e5e7eb;
-    font-family: var(--font-sans);
+    background-color: var(--vx-void);
+    color: var(--vx-fg);
+    font-family: var(--vx-font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
-    background: rgb(57 255 20 / 0.25);
-    color: #fff;
+    background: var(--vx-selection);
+    color: var(--vx-fg-strong);
   }
 
   ::-webkit-scrollbar {
@@ -53,30 +208,31 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-void);
+    background: var(--vx-void);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #2a2a2a;
+    background: var(--vx-scrollbar);
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a3a3a;
+    background: var(--vx-scrollbar-hover);
   }
 }
 
 @layer utilities {
   .text-glow {
-    text-shadow: 0 0 8px rgb(57 255 20 / 0.55);
+    text-shadow: var(--vx-glow-text);
   }
 
   .border-glow {
-    box-shadow: var(--shadow-glow-sm);
+    box-shadow: var(--vx-shadow-glow-sm);
   }
 
   .neon-ring {
-    box-shadow: 0 0 0 1px rgb(57 255 20 / 0.4), var(--shadow-glow-sm);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--vx-neon) 40%, transparent),
+      var(--vx-shadow-glow-sm);
   }
 }
 

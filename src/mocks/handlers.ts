@@ -106,6 +106,23 @@ export const handlers = [
     return HttpResponse.json(db.publicUser())
   }),
 
+  http.post('/api/v1/auth/password', async ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    const body = (await request.json()) as {
+      current_password?: string
+      new_password?: string
+    }
+    const dbUser = db.getUser()
+    if (body.current_password !== dbUser.password) {
+      return bad('Current password is incorrect', 'invalid_password')
+    }
+    if (!body.new_password || body.new_password.length < 8) {
+      return bad('New password must be at least 8 characters', 'weak_password')
+    }
+    db.setUser({ ...dbUser, password: body.new_password })
+    return HttpResponse.json(null, { status: 204 })
+  }),
+
   http.get('/api/v1/hosts', ({ request }) => {
     if (!authUser(request)) return unauthorized()
     return HttpResponse.json(db.hosts)

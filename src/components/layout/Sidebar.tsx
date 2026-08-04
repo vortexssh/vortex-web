@@ -8,15 +8,17 @@ import {
   ShieldCheck,
   Settings,
   X,
+  Lock,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/hosts', label: 'Hosts', icon: Server },
-  { to: '/terminal', label: 'WebSSH', icon: Terminal },
-  { to: '/tasks', label: 'Tasks', icon: Clock },
-  { to: '/security/2fa', label: '2FA Setup', icon: ShieldCheck },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, needs2fa: true },
+  { to: '/hosts', label: 'Hosts', icon: Server, needs2fa: false },
+  { to: '/terminal', label: 'WebSSH', icon: Terminal, needs2fa: true },
+  { to: '/tasks', label: 'Tasks', icon: Clock, needs2fa: true },
+  { to: '/security/2fa', label: '2FA Setup', icon: ShieldCheck, needs2fa: false },
+  { to: '/settings', label: 'Settings', icon: Settings, needs2fa: false },
 ] as const
 
 interface SidebarProps {
@@ -25,6 +27,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+  const is2faEnabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
+
   return (
     <>
       {mobileOpen ? (
@@ -58,25 +62,29 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, ...rest }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={'end' in rest ? rest.end : false}
-              onClick={onClose}
-              className={({ isActive }) =>
-                [
-                  'group flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors',
-                  isActive
-                    ? 'border-neon/40 bg-neon/10 text-neon border-glow'
-                    : 'border-transparent text-dim hover:border-border-active hover:bg-panel hover:text-neon/80',
-                ].join(' ')
-              }
-            >
-              <Icon className="h-4 w-4 shrink-0 opacity-80" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map(({ to, label, icon: Icon, needs2fa, ...rest }) => {
+            const locked = needs2fa && !is2faEnabled
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={'end' in rest ? rest.end : false}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  [
+                    'group flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors',
+                    isActive
+                      ? 'border-neon/40 bg-neon/10 text-neon border-glow'
+                      : 'border-transparent text-dim hover:border-border-active hover:bg-panel hover:text-neon/80',
+                  ].join(' ')
+                }
+              >
+                <Icon className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="flex-1">{label}</span>
+                {locked ? <Lock className="h-3 w-3 shrink-0 text-warn opacity-80" /> : null}
+              </NavLink>
+            )
+          })}
         </nav>
 
         <div className="border-t border-border p-3">

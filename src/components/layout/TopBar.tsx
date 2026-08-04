@@ -30,7 +30,7 @@ export function TopBar({ title, subtitle, menuSlot }: TopBarProps) {
       <div className="flex items-center gap-3">
         {menuSlot}
         <div>
-          <h1 className="text-sm font-semibold tracking-wide text-white">{title}</h1>
+          <h1 className="text-sm font-semibold tracking-wide text-fg-strong">{title}</h1>
           {subtitle ? (
             <p className="font-mono text-[11px] text-muted">{subtitle}</p>
           ) : null}

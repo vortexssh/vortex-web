@@ -288,7 +288,7 @@ function AuthShell({
             </div>
           </div>
         </div>
-        <h1 className="text-lg font-semibold text-white">{title}</h1>
+        <h1 className="text-lg font-semibold text-fg-strong">{title}</h1>
         <p className="mb-6 font-mono text-xs text-muted">{subtitle}</p>
         {children}
       </div>
