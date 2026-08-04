@@ -456,24 +456,18 @@ function HostEditorModal({
         if (proxy !== host.is_proxy_enabled) {
           saved = await hostsApi.setProxy(host.id, proxy)
         }
-        const current = new Set(host.tags.map((t) => t.id))
-        const next = new Set(tagIds)
-        for (const id of next) {
-          if (!current.has(id)) saved = await hostsApi.attachTag(host.id, id)
-        }
-        for (const id of current) {
-          if (!next.has(id)) saved = await hostsApi.detachTag(host.id, id)
-        }
+        saved = await hostsApi.setTags(host.id, tagIds)
       } else {
         saved = await hostsApi.create(payload)
-        for (const id of tagIds) {
-          saved = await hostsApi.attachTag(saved.id, id)
+        if (tagIds.length > 0) {
+          saved = await hostsApi.setTags(saved.id, tagIds)
         }
       }
       return saved
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })
+      void qc.invalidateQueries({ queryKey: ['tags'] })
       toast(host ? 'Host updated' : 'Host created', 'success')
       onClose()
     },
@@ -482,13 +476,16 @@ function HostEditorModal({
   })
 
   const createTagMutation = useMutation({
-    mutationFn: () => tagsApi.create({ name: newTagName, color: '#39FF14' }),
+    mutationFn: () =>
+      tagsApi.create({ name: newTagName.trim(), color: '#39FF14' }),
     onSuccess: (tag) => {
       void qc.invalidateQueries({ queryKey: ['tags'] })
-      setTagIds((ids) => [...ids, tag.id])
+      setTagIds((ids) => (ids.includes(tag.id) ? ids : [...ids, tag.id]))
       setNewTagName('')
       toast('Tag created', 'success')
     },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Could not create tag', 'error'),
   })
 
   function onSubmit(e: FormEvent) {
@@ -581,7 +578,7 @@ function HostEditorModal({
             />
             <Button
               variant="outline"
-              disabled={!newTagName.trim()}
+              disabled={!newTagName.trim() || createTagMutation.isPending}
               onClick={() => createTagMutation.mutate()}
             >
               Add tag

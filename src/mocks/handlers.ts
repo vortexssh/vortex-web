@@ -259,6 +259,16 @@ export const handlers = [
     return HttpResponse.json(null, { status: 204 })
   }),
 
+  http.put('/api/v1/hosts/:id/tags', async ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const host = db.findHost(String(params.id))
+    if (!host) return bad('Host not found', 'host_not_found', 404)
+    const body = (await request.json()) as { tag_ids?: string[] }
+    const ids = body.tag_ids ?? []
+    host.tags = db.resolveTags(ids)
+    return HttpResponse.json(host)
+  }),
+
   http.post('/api/v1/hosts/:id/tags/:tagId', ({ request, params }) => {
     if (!authUser(request)) return unauthorized()
     const host = db.findHost(String(params.id))

@@ -53,4 +53,11 @@ export const hostsApi = {
   detachTag(hostId: string, tagId: string): Promise<Host> {
     return apiRequest<Host>(`/hosts/${hostId}/tags/${tagId}`, { method: 'DELETE' })
   },
+
+  setTags(hostId: string, tag_ids: string[]): Promise<Host> {
+    return apiRequest<Host>(`/hosts/${hostId}/tags`, {
+      method: 'PUT',
+      body: { tag_ids },
+    })
+  },
 }
