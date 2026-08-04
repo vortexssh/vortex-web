@@ -24,6 +24,9 @@ const TasksPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const PublicStatusPage = lazy(() =>
+  import('@/features/status/PublicStatusPage').then((m) => ({ default: m.PublicStatusPage })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +71,14 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route
+              path="/u/:slug"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <PublicStatusPage />
+                </Suspense>
+              }
+            />
             <Route
               element={
                 <RequireAuth>

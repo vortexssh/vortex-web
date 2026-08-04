@@ -1,6 +1,7 @@
 export interface User {
   id: string
   email: string
+  public_slug: string | null
   is_2fa_enabled: boolean
   is_active: boolean
   created_at: string
@@ -55,6 +56,8 @@ export interface Host {
   port: number
   username: string
   notes: string | null
+  country_code: string | null
+  is_hidden: boolean
   is_proxy_enabled: boolean
   tags: Tag[]
   agent: Agent | null
@@ -68,6 +71,8 @@ export interface CreateHostPayload {
   port: number
   username: string
   notes?: string | null
+  country_code?: string | null
+  is_hidden?: boolean
   is_proxy_enabled?: boolean
 }
 
@@ -77,6 +82,31 @@ export interface UpdateHostPayload {
   port?: number
   username?: string
   notes?: string | null
+  country_code?: string | null
+  is_hidden?: boolean
+}
+
+/** Public status page (no IPs / SSH metadata). */
+export interface PublicTelemetry {
+  cpu_percent: number | null
+  ram_percent: number | null
+  net_bytes_sent: number | null
+  net_bytes_recv: number | null
+  uptime_seconds: number | null
+  collected_at: string | null
+}
+
+export interface PublicHost {
+  id: string
+  name: string
+  country_code: string | null
+  agent_online: boolean
+  telemetry: PublicTelemetry | null
+}
+
+export interface PublicStatusPage {
+  slug: string
+  hosts: PublicHost[]
 }
 
 /** Latest telemetry snapshot from Redis (TTL-backed). */

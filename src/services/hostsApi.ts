@@ -32,6 +32,13 @@ export const hostsApi = {
     })
   },
 
+  setHidden(id: string, is_hidden: boolean): Promise<Host> {
+    return apiRequest<Host>(`/hosts/${id}/hidden`, {
+      method: 'PATCH',
+      body: { is_hidden },
+    })
+  },
+
   attachTag(hostId: string, tagId: string): Promise<Host> {
     return apiRequest<Host>(`/hosts/${hostId}/tags/${tagId}`, { method: 'POST' })
   },

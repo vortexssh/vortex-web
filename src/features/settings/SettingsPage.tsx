@@ -15,6 +15,7 @@ export function SettingsPage() {
   const user = useAuthStore((s) => s.user)
   const setUser = useAuthStore((s) => s.setUser)
   const [email, setEmail] = useState(user?.email ?? '')
+  const [publicSlug, setPublicSlug] = useState(user?.public_slug ?? '')
   const [disableCode, setDisableCode] = useState('')
   const [newKeyName, setNewKeyName] = useState('')
   const [rawKey, setRawKey] = useState<string | null>(null)
@@ -22,10 +23,20 @@ export function SettingsPage() {
 
   const keysQuery = useQuery({ queryKey: ['api-keys'], queryFn: () => apiKeysApi.list() })
 
+  const statusUrl =
+    publicSlug.trim().length >= 2
+      ? `${window.location.origin}/u/${publicSlug.trim().toLowerCase()}`
+      : null
+
   const profileMutation = useMutation({
-    mutationFn: () => authApi.updateMe({ email }),
+    mutationFn: () =>
+      authApi.updateMe({
+        email,
+        public_slug: publicSlug.trim() ? publicSlug.trim().toLowerCase() : null,
+      }),
     onSuccess: (u) => {
       setUser(u)
+      setPublicSlug(u.public_slug ?? '')
       toast('Profile updated', 'success')
     },
     onError: (err: unknown) =>
@@ -68,6 +79,16 @@ export function SettingsPage() {
     profileMutation.mutate()
   }
 
+  async function copyStatusUrl() {
+    if (!statusUrl) return
+    try {
+      await navigator.clipboard.writeText(statusUrl)
+      toast('Status URL copied', 'success')
+    } catch {
+      toast('Could not copy URL', 'error')
+    }
+  }
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <section className="rounded-lg border border-border bg-panel p-4">
@@ -80,6 +101,25 @@ export function SettingsPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
+          <Input
+            label="Public status slug"
+            value={publicSlug}
+            onChange={(e) => setPublicSlug(e.target.value)}
+            placeholder="e.g. timant32"
+            pattern="[a-zA-Z0-9][a-zA-Z0-9-]{1,62}"
+            title="2–63 chars: letters, digits, hyphens"
+          />
+          <p className="text-xs text-dim">
+            Empty disables the public page. Hosts with Hidden=ON are omitted. No IPs shown.
+          </p>
+          {statusUrl ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-void px-3 py-2">
+              <code className="min-w-0 flex-1 truncate font-mono text-xs text-neon">{statusUrl}</code>
+              <Button type="button" variant="outline" className="!text-xs" onClick={() => void copyStatusUrl()}>
+                Copy
+              </Button>
+            </div>
+          ) : null}
           <div>
             <Badge tone={user?.is_2fa_enabled ? 'neon' : 'warn'}>
               2FA {user?.is_2fa_enabled ? 'enabled' : 'disabled'}

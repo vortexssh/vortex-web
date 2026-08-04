@@ -13,6 +13,7 @@ import { Table } from '@/components/ui/Table'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast, toastCopy } from '@/components/ui/Toast'
 import { buildAgentInstallBundle } from '@/features/hosts/agentInstall'
+import { countryFlag } from '@/lib/countryFlag'
 
 type EnrollState = {
   host: Host
@@ -66,6 +67,17 @@ export function HostsPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })
       toast('Proxy setting updated', 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Update failed', 'error'),
+  })
+
+  const hiddenMutation = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
+      hostsApi.setHidden(id, value),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['hosts'] })
+      toast('Public visibility updated', 'success')
     },
     onError: (err: unknown) =>
       toast(err instanceof ApiError ? err.message : 'Update failed', 'error'),
@@ -168,7 +180,12 @@ export function HostsPage() {
             header: 'Host',
             render: (h) => (
               <div>
-                <div className="font-medium text-white">{h.name}</div>
+                <div className="flex items-center gap-1.5 font-medium text-white">
+                  <span className="text-base leading-none" title={h.country_code ?? undefined}>
+                    {countryFlag(h.country_code)}
+                  </span>
+                  <span>{h.name}</span>
+                </div>
                 <div className="font-mono text-[11px] text-muted">
                   {h.username}@{h.ip_address ?? 'NAT'}:{h.port}
                 </div>
@@ -201,6 +218,17 @@ export function HostsPage() {
                 checked={h.is_proxy_enabled}
                 onChange={(value) => proxyMutation.mutate({ id: h.id, value })}
                 label={h.is_proxy_enabled ? 'ON' : 'OFF'}
+              />
+            ),
+          },
+          {
+            key: 'hidden',
+            header: 'Hidden on /u',
+            render: (h) => (
+              <Toggle
+                checked={h.is_hidden}
+                onChange={(value) => hiddenMutation.mutate({ id: h.id, value })}
+                label={h.is_hidden ? 'yes' : 'no'}
               />
             ),
           },

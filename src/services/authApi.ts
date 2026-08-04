@@ -31,7 +31,7 @@ export const authApi = {
     return apiRequest<User>('/users/me')
   },
 
-  updateMe(payload: { email?: string }): Promise<User> {
+  updateMe(payload: { email?: string; public_slug?: string | null }): Promise<User> {
     return apiRequest<User>('/users/me', { method: 'PATCH', body: payload })
   },
 

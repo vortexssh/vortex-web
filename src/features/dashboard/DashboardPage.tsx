@@ -5,6 +5,7 @@ import { useTelemetrySocket } from '@/hooks/useTelemetrySocket'
 import { MetricChart } from './MetricChart'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { countryFlag } from '@/lib/countryFlag'
 
 function formatUptime(seconds: number): string {
   if (seconds <= 0) return '—'
@@ -129,9 +130,13 @@ export function DashboardPage() {
           {hosts.map((h) => (
             <li key={h.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <div>
-                <div className="text-white">{h.name}</div>
+                <div className="flex items-center gap-1.5 text-white">
+                  <span className="text-base leading-none">{countryFlag(h.country_code)}</span>
+                  <span>{h.name}</span>
+                </div>
                 <div className="font-mono text-[11px] text-muted">
                   {h.ip_address ?? 'NAT'} · proxy {h.is_proxy_enabled ? 'ON' : 'OFF'}
+                  {h.is_hidden ? ' · hidden' : ''}
                 </div>
               </div>
               <Badge tone={h.agent?.is_online ? 'neon' : 'muted'}>

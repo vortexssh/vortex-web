@@ -40,3 +40,21 @@ Container listens on `127.0.0.1:18080`. Host nginx terminates TLS for `vortex.ti
 
 - No SSH passwords / private keys in the browser.
 - Dashboard / Hosts / WebSSH / Tasks require `is_2fa_enabled`.
+
+## Public status page
+
+Each user can publish a chrome-free fleet page at `/u/{slug}` (set slug in Settings).
+
+- No links into the console, no IPs / SSH metadata.
+- Hosts with **Hidden** enabled are omitted.
+- Telemetry polls `GET /api/v1/public/u/{slug}` every 5s.
+- Country flags use `hosts.country_code` (filled later from agent GeoIP).
+
+Example reverse-proxy of a single status page:
+
+```nginx
+location /status/ {
+  proxy_pass https://vortex.timant32.ru/u/timant32/;
+}
+# Browser still calls Core API (CORS) unless you also proxy /api/.
+```

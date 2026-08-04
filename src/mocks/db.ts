@@ -34,6 +34,8 @@ const hosts: Host[] = [
     port: 22,
     username: 'root',
     notes: null,
+    country_code: 'DE',
+    is_hidden: false,
     is_proxy_enabled: true,
     tags: [tags[0]!],
     agent: {
@@ -70,6 +72,7 @@ const sessions = new Map<string, string>()
 let user: DbUser = {
   id: USER_ID,
   email: 'admin@vortex.local',
+  public_slug: 'demo',
   password: 'vortex12345',
   is_2fa_enabled: false,
   is_active: true,
@@ -87,6 +90,7 @@ export const db = {
   publicUser: (): User => ({
     id: user.id,
     email: user.email,
+    public_slug: user.public_slug,
     is_2fa_enabled: user.is_2fa_enabled,
     is_active: user.is_active,
     created_at: user.created_at,

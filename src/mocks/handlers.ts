@@ -65,9 +65,15 @@ export const handlers = [
   http.patch('/api/v1/users/me', async ({ request }) => {
     const user = authUser(request)
     if (!user) return unauthorized()
-    const body = (await request.json()) as { email?: string }
+    const body = (await request.json()) as { email?: string; public_slug?: string | null }
     const dbUser = db.getUser()
-    if (body.email) db.setUser({ ...dbUser, email: body.email })
+    db.setUser({
+      ...dbUser,
+      ...(body.email ? { email: body.email } : {}),
+      ...(body.public_slug !== undefined
+        ? { public_slug: body.public_slug?.trim() ? body.public_slug.trim().toLowerCase() : null }
+        : {}),
+    })
     return HttpResponse.json(db.publicUser())
   }),
 
@@ -115,6 +121,8 @@ export const handlers = [
       port: body.port,
       username: body.username,
       notes: body.notes ?? null,
+      country_code: body.country_code ?? null,
+      is_hidden: body.is_hidden ?? false,
       is_proxy_enabled: body.is_proxy_enabled ?? false,
       tags: [],
       agent: null,
@@ -136,6 +144,8 @@ export const handlers = [
       port: body.port ?? host.port,
       username: body.username ?? host.username,
       notes: body.notes === undefined ? host.notes : body.notes,
+      country_code: body.country_code === undefined ? host.country_code : body.country_code,
+      is_hidden: body.is_hidden === undefined ? host.is_hidden : body.is_hidden,
       updated_at: new Date().toISOString(),
     })
     return HttpResponse.json(host)
@@ -147,6 +157,16 @@ export const handlers = [
     if (!host) return bad('Host not found', 'host_not_found', 404)
     const body = (await request.json()) as { is_proxy_enabled?: boolean }
     host.is_proxy_enabled = Boolean(body.is_proxy_enabled)
+    host.updated_at = new Date().toISOString()
+    return HttpResponse.json(host)
+  }),
+
+  http.patch('/api/v1/hosts/:id/hidden', async ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const host = db.findHost(String(params.id))
+    if (!host) return bad('Host not found', 'host_not_found', 404)
+    const body = (await request.json()) as { is_hidden?: boolean }
+    host.is_hidden = Boolean(body.is_hidden)
     host.updated_at = new Date().toISOString()
     return HttpResponse.json(host)
   }),
@@ -337,6 +357,36 @@ export const handlers = [
     if (idx < 0) return bad('Key not found', 'key_not_found', 404)
     db.apiKeys.splice(idx, 1)
     return HttpResponse.json(null, { status: 204 })
+  }),
+
+  http.get('/api/v1/public/u/:slug', ({ params }) => {
+    const slug = String(params.slug).toLowerCase()
+    const u = db.getUser()
+    if (!u.public_slug || u.public_slug !== slug || !u.is_active) {
+      return bad('Status page not found', 'status_not_found', 404)
+    }
+    const hosts = db.hosts
+      .filter((h) => !h.is_hidden)
+      .map((h) => {
+        const t = db.telemetryByHost[h.id]
+        return {
+          id: h.id,
+          name: h.name,
+          country_code: h.country_code,
+          agent_online: Boolean(h.agent?.is_online),
+          telemetry: t
+            ? {
+                cpu_percent: t.cpu_percent,
+                ram_percent: t.ram_percent,
+                net_bytes_sent: t.net_bytes_sent,
+                net_bytes_recv: t.net_bytes_recv,
+                uptime_seconds: t.uptime_seconds,
+                collected_at: t.collected_at,
+              }
+            : null,
+        }
+      })
+    return HttpResponse.json({ slug: u.public_slug, hosts })
   }),
 
   http.get('/api/v1/health', () => HttpResponse.json({ status: 'ok' })),
