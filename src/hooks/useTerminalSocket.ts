@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { TOKEN_STORAGE_KEY, WS_BASE_URL } from '@/config/env'
 import { useWebSocket } from './useWebSocket'
 
