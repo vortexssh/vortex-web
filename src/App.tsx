@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth } from '@/components/auth/RequireAuth'
 import { Require2FA } from '@/components/auth/Require2FA'
 import { ToastViewport } from '@/components/ui/Toast'
-import { LoginPage, RegisterPage } from '@/features/auth/AuthPages'
+import { LoginPage, RegisterPage, VerifyEmailPage } from '@/features/auth/AuthPages'
 import { Setup2FAPage } from '@/features/auth/Setup2FAPage'
 import { useAuthStore } from '@/store/authStore'
 
@@ -71,6 +71,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route
               path="/u/:slug"
               element={

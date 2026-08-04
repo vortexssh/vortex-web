@@ -3,8 +3,14 @@ export interface User {
   email: string
   public_slug: string | null
   is_2fa_enabled: boolean
+  is_email_verified: boolean
   is_active: boolean
   created_at: string
+}
+
+export interface RegisterResponse {
+  email: string
+  message: string
 }
 
 export interface ApiKey {
@@ -57,6 +63,7 @@ export interface Host {
   username: string
   notes: string | null
   country_code: string | null
+  sort_order: number
   is_hidden: boolean
   is_proxy_enabled: boolean
   tags: Tag[]

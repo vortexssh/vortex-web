@@ -30,9 +30,17 @@ export const handlers = [
       email: body.email,
       password: body.password,
       is_2fa_enabled: false,
+      is_email_verified: false,
       totp_secret: null,
     })
-    return HttpResponse.json(db.publicUser(), { status: 201 })
+    db.issueVerificationToken(db.getUser().id)
+    return HttpResponse.json(
+      {
+        email: body.email,
+        message: 'Check your inbox to confirm your email',
+      },
+      { status: 201 },
+    )
   }),
 
   http.post('/api/v1/auth/login', async ({ request }) => {
@@ -45,6 +53,9 @@ export const handlers = [
     if (body.email !== user.email || body.password !== user.password) {
       return bad('Invalid credentials', 'invalid_credentials', 401)
     }
+    if (!user.is_email_verified) {
+      return bad('Confirm your email before signing in', 'email_not_verified', 403)
+    }
     if (user.is_2fa_enabled) {
       if (!body.totp_code || body.totp_code.length < 6) {
         return bad('TOTP code required', 'totp_required', 401)
@@ -53,6 +64,36 @@ export const handlers = [
     return HttpResponse.json({
       access_token: db.issueToken(user.id),
       token_type: 'bearer',
+    })
+  }),
+
+  http.post('/api/v1/auth/verify-email', async ({ request }) => {
+    const body = (await request.json()) as { token?: string }
+    if (!body.token || body.token.length < 16) {
+      return bad('Verification link is invalid or expired', 'invalid_verification_token')
+    }
+    const userId = db.consumeVerificationToken(body.token)
+    const user = db.getUser()
+    if (!userId && !body.token.startsWith('evt_')) {
+      return bad('Verification link is invalid or expired', 'invalid_verification_token')
+    }
+    db.setUser({ ...user, is_email_verified: true })
+    return HttpResponse.json({
+      access_token: db.issueToken(user.id),
+      token_type: 'bearer',
+    })
+  }),
+
+  http.post('/api/v1/auth/resend-verification', async ({ request }) => {
+    const body = (await request.json()) as { email?: string }
+    if (!body.email) return bad('Email required')
+    const user = db.getUser()
+    if (user.email === body.email && !user.is_email_verified) {
+      db.issueVerificationToken(user.id)
+    }
+    return HttpResponse.json({
+      email: body.email,
+      message: 'If that address needs verification, a new email was sent',
     })
   }),
 
@@ -125,7 +166,28 @@ export const handlers = [
 
   http.get('/api/v1/hosts', ({ request }) => {
     if (!authUser(request)) return unauthorized()
-    return HttpResponse.json(db.hosts)
+    return HttpResponse.json([...db.hosts].sort((a, b) => a.sort_order - b.sort_order))
+  }),
+
+  http.patch('/api/v1/hosts/reorder', async ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    const body = (await request.json()) as { host_ids?: string[] }
+    const ids = body.host_ids ?? []
+    const byId = new Map(db.hosts.map((h) => [h.id, h]))
+    const next: typeof db.hosts = []
+    for (let i = 0; i < ids.length; i++) {
+      const h = byId.get(ids[i]!)
+      if (!h) return bad('Host not found', 'host_not_found', 404)
+      h.sort_order = i
+      h.updated_at = new Date().toISOString()
+      next.push(h)
+    }
+    for (const h of db.hosts) {
+      if (!ids.includes(h.id)) next.push(h)
+    }
+    db.hosts.length = 0
+    db.hosts.push(...next)
+    return HttpResponse.json([...db.hosts].sort((a, b) => a.sort_order - b.sort_order))
   }),
 
   http.post('/api/v1/hosts', async ({ request }) => {
@@ -140,6 +202,7 @@ export const handlers = [
       notes: body.notes ?? null,
       country_code: body.country_code ?? null,
       is_hidden: body.is_hidden ?? false,
+      sort_order: db.hosts.length,
       is_proxy_enabled: body.is_proxy_enabled ?? false,
       tags: [],
       agent: null,

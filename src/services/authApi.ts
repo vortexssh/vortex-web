@@ -1,5 +1,5 @@
 import { apiRequest, setStoredToken } from './apiClient'
-import type { AuthTokens, TotpSetupResponse, User } from '@/types'
+import type { AuthTokens, RegisterResponse, TotpSetupResponse, User } from '@/types'
 
 export interface Credentials {
   email: string
@@ -11,8 +11,8 @@ export interface LoginPayload extends Credentials {
 }
 
 export const authApi = {
-  register(payload: Credentials): Promise<User> {
-    return apiRequest<User>('/auth/register', {
+  register(payload: Credentials): Promise<RegisterResponse> {
+    return apiRequest<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: payload,
       auth: false,
@@ -23,6 +23,22 @@ export const authApi = {
     return apiRequest<AuthTokens>('/auth/login', {
       method: 'POST',
       body: payload,
+      auth: false,
+    })
+  },
+
+  verifyEmail(token: string): Promise<AuthTokens> {
+    return apiRequest<AuthTokens>('/auth/verify-email', {
+      method: 'POST',
+      body: { token },
+      auth: false,
+    })
+  },
+
+  resendVerification(email: string): Promise<RegisterResponse> {
+    return apiRequest<RegisterResponse>('/auth/resend-verification', {
+      method: 'POST',
+      body: { email },
       auth: false,
     })
   },

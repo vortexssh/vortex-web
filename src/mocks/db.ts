@@ -35,6 +35,7 @@ const hosts: Host[] = [
     username: 'root',
     notes: null,
     country_code: 'DE',
+    sort_order: 0,
     is_hidden: false,
     is_proxy_enabled: true,
     tags: [tags[0]!],
@@ -75,10 +76,13 @@ let user: DbUser = {
   public_slug: 'demo',
   password: 'vortex12345',
   is_2fa_enabled: false,
+  is_email_verified: true,
   is_active: true,
   totp_secret: null,
   created_at: now(),
 }
+
+const verificationTokens = new Map<string, string>()
 
 export const db = {
   USER_ID,
@@ -92,9 +96,21 @@ export const db = {
     email: user.email,
     public_slug: user.public_slug,
     is_2fa_enabled: user.is_2fa_enabled,
+    is_email_verified: user.is_email_verified,
     is_active: user.is_active,
     created_at: user.created_at,
   }),
+  issueVerificationToken: (userId: string) => {
+    const token = `evt_${crypto.randomUUID().replace(/-/g, '')}`
+    verificationTokens.set(token, userId)
+    return token
+  },
+  consumeVerificationToken: (token: string) => {
+    const userId = verificationTokens.get(token)
+    if (!userId) return null
+    verificationTokens.delete(token)
+    return userId
+  },
   sessions,
   tags,
   hosts,

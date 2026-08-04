@@ -94,6 +94,28 @@ export function HostsPage() {
       toast(err instanceof ApiError ? err.message : 'Update failed', 'error'),
   })
 
+  const reorderMutation = useMutation({
+    mutationFn: (host_ids: string[]) => hostsApi.reorder(host_ids),
+    onSuccess: (hosts) => {
+      qc.setQueryData(['hosts'], hosts)
+      toast('Order updated', 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Reorder failed', 'error'),
+  })
+
+  function moveHost(id: string, dir: -1 | 1) {
+    const all = [...(hostsQuery.data ?? [])]
+    const i = all.findIndex((h) => h.id === id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= all.length) return
+    const next = [...all]
+    const tmp = next[i]!
+    next[i] = next[j]!
+    next[j] = tmp
+    reorderMutation.mutate(next.map((h) => h.id))
+  }
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => hostsApi.remove(id),
     onSuccess: () => {
@@ -265,6 +287,24 @@ export function HostsPage() {
             header: '',
             render: (h) => (
               <div className="flex flex-wrap gap-1">
+                <Button
+                  variant="ghost"
+                  className="!px-2 !text-xs"
+                  title="Move up"
+                  disabled={reorderMutation.isPending}
+                  onClick={() => moveHost(h.id, -1)}
+                >
+                  ↑
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="!px-2 !text-xs"
+                  title="Move down"
+                  disabled={reorderMutation.isPending}
+                  onClick={() => moveHost(h.id, 1)}
+                >
+                  ↓
+                </Button>
                 <Button variant="outline" className="!text-xs" onClick={() => setEditor(h)}>
                   Edit
                 </Button>

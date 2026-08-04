@@ -39,6 +39,13 @@ export const hostsApi = {
     })
   },
 
+  reorder(host_ids: string[]): Promise<Host[]> {
+    return apiRequest<Host[]>('/hosts/reorder', {
+      method: 'PATCH',
+      body: { host_ids },
+    })
+  },
+
   attachTag(hostId: string, tagId: string): Promise<Host> {
     return apiRequest<Host>(`/hosts/${hostId}/tags/${tagId}`, { method: 'POST' })
   },

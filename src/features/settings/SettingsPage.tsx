@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/services/authApi'
 import { apiKeysApi } from '@/services/telemetryApi'
@@ -55,8 +55,10 @@ export function SettingsPage() {
 }
 
 function ProfileSection() {
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const setUser = useAuthStore((s) => s.setUser)
+  const clearSession = useAuthStore((s) => s.clearSession)
   const [email, setEmail] = useState(user?.email ?? '')
   const [publicSlug, setPublicSlug] = useState(user?.public_slug ?? '')
 
@@ -72,6 +74,12 @@ function ProfileSection() {
         public_slug: publicSlug.trim() ? publicSlug.trim().toLowerCase() : null,
       }),
     onSuccess: (u) => {
+      if (!u.is_email_verified) {
+        clearSession()
+        toast('Confirm your new email, then sign in again', 'success')
+        navigate('/login', { replace: true })
+        return
+      }
       setUser(u)
       setPublicSlug(u.public_slug ?? '')
       toast('Profile updated', 'success')
@@ -107,6 +115,9 @@ function ProfileSection() {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
+        <p className="font-mono text-[10px] text-muted">
+          Changing email requires re-confirmation; you will be signed out until verified.
+        </p>
         <Input
           label="Public status slug"
           value={publicSlug}

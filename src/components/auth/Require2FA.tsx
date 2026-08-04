@@ -14,7 +14,8 @@ export function isAgentProtectedPath(pathname: string): boolean {
     pathname.startsWith('/settings') ||
     pathname.startsWith('/hosts') ||
     pathname.startsWith('/login') ||
-    pathname.startsWith('/register')
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/verify-email')
   ) {
     return false
   }
