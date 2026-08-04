@@ -172,6 +172,11 @@ export function HostsPage() {
                 <div className="font-mono text-[11px] text-muted">
                   {h.username}@{h.ip_address ?? 'NAT'}:{h.port}
                 </div>
+                {h.notes?.trim() ? (
+                  <div className="mt-1 line-clamp-2 max-w-xs text-[11px] text-dim">
+                    {h.notes}
+                  </div>
+                ) : null}
               </div>
             ),
           },
@@ -340,6 +345,7 @@ function HostEditorModal({
   const [ip, setIp] = useState(host?.ip_address ?? '')
   const [port, setPort] = useState(String(host?.port ?? 22))
   const [username, setUsername] = useState(host?.username ?? 'root')
+  const [notes, setNotes] = useState(host?.notes ?? '')
   const [proxy, setProxy] = useState(host?.is_proxy_enabled ?? false)
   const [tagIds, setTagIds] = useState<string[]>(host?.tags.map((t) => t.id) ?? [])
   const [newTagName, setNewTagName] = useState('')
@@ -352,6 +358,7 @@ function HostEditorModal({
         ip_address: ip.trim() ? ip.trim() : null,
         port: Number(port),
         username,
+        notes: notes.trim() ? notes : null,
         ...(host ? {} : { is_proxy_enabled: proxy }),
       }
 
@@ -362,6 +369,7 @@ function HostEditorModal({
           ip_address: payload.ip_address,
           port: payload.port,
           username: payload.username,
+          notes: payload.notes,
         })
         if (proxy !== host.is_proxy_enabled) {
           saved = await hostsApi.setProxy(host.id, proxy)
@@ -445,6 +453,16 @@ function HostEditorModal({
             required
           />
         </div>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-xs uppercase tracking-wider text-muted">Notes</span>
+          <textarea
+            className="min-h-[88px] resize-y rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-white outline-none transition-colors placeholder:text-muted focus:border-neon/50 focus:neon-ring"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Free-form notes for this host…"
+            maxLength={16384}
+          />
+        </label>
         <Toggle
           checked={proxy}
           onChange={setProxy}

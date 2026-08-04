@@ -58,7 +58,11 @@ export function TerminalPage() {
       </div>
 
       {selectedId && selected?.agent?.is_online ? (
-        <TerminalView hostId={selectedId} hostName={selected.name} />
+        <TerminalView
+          hostId={selectedId}
+          hostName={selected.name}
+          notes={selected.notes ?? ''}
+        />
       ) : (
         <div className="rounded-lg border border-border bg-panel p-6 text-sm text-dim">
           Select a host with an online agent.
@@ -68,10 +72,19 @@ export function TerminalPage() {
   )
 }
 
-function TerminalView({ hostId, hostName }: { hostId: string; hostName: string }) {
+function TerminalView({
+  hostId,
+  hostName,
+  notes,
+}: {
+  hostId: string
+  hostName: string
+  notes: string
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const [fitted, setFitted] = useState<{ cols: number; rows: number } | null>(null)
 
   const onData = useCallback((data: string) => {
     termRef.current?.write(data)
@@ -79,16 +92,24 @@ function TerminalView({ hostId, hostName }: { hostId: string; hostName: string }
 
   const { status, sendInput, resize, reconnect } = useTerminalSocket({
     hostId,
-    enabled: true,
+    enabled: fitted !== null,
+    cols: fitted?.cols ?? 80,
+    rows: fitted?.rows ?? 24,
     onData,
   })
+
+  useEffect(() => {
+    setFitted(null)
+  }, [hostId])
 
   useEffect(() => {
     if (!containerRef.current) return
     const term = new Terminal({
       cursorBlink: true,
+      convertEol: true,
       fontFamily: '"JetBrains Mono", ui-monospace, monospace',
       fontSize: 13,
+      lineHeight: 1.2,
       theme: {
         background: '#0a0a0a',
         foreground: '#39ff14',
@@ -101,22 +122,43 @@ function TerminalView({ hostId, hostName }: { hostId: string; hostName: string }
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(containerRef.current)
-    fit.fit()
     termRef.current = term
     fitRef.current = fit
 
     const disposable = term.onData((data) => sendInput(data))
 
-    const onResize = () => {
-      fit.fit()
-      resize(term.cols, term.rows)
+    const applyFit = () => {
+      try {
+        fit.fit()
+      } catch {
+        return
+      }
+      const cols = term.cols
+      const rows = term.rows
+      if (cols < 2 || rows < 1) return
+      setFitted((prev) => {
+        if (prev && prev.cols === cols && prev.rows === rows) return prev
+        if (prev !== null) resize(cols, rows)
+        return { cols, rows }
+      })
     }
-    window.addEventListener('resize', onResize)
-    onResize()
+
+    // Defer first fit until layout + webfont metrics settle.
+    const raf = window.requestAnimationFrame(() => {
+      applyFit()
+      window.setTimeout(applyFit, 50)
+    })
+
+    const ro = new ResizeObserver(() => applyFit())
+    ro.observe(containerRef.current)
+    window.addEventListener('resize', applyFit)
+    document.fonts?.ready?.then(() => applyFit()).catch(() => undefined)
 
     return () => {
+      window.cancelAnimationFrame(raf)
       disposable.dispose()
-      window.removeEventListener('resize', onResize)
+      ro.disconnect()
+      window.removeEventListener('resize', applyFit)
       term.dispose()
       termRef.current = null
       fitRef.current = null
@@ -124,21 +166,34 @@ function TerminalView({ hostId, hostName }: { hostId: string; hostName: string }
   }, [hostId, sendInput, resize])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-void">
-      <div className="flex items-center justify-between border-b border-border bg-surface px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-dim">{hostName}</span>
-          <Badge tone={status === 'open' ? 'neon' : status === 'connecting' ? 'warn' : 'danger'}>
-            {status}
-          </Badge>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-void">
+        <div className="flex items-center justify-between border-b border-border bg-surface px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-dim">{hostName}</span>
+            <Badge tone={status === 'open' ? 'neon' : status === 'connecting' ? 'warn' : 'danger'}>
+              {status}
+            </Badge>
+            {fitted ? (
+              <span className="font-mono text-[10px] text-muted">
+                {fitted.cols}×{fitted.rows}
+              </span>
+            ) : null}
+          </div>
+          {status !== 'open' ? (
+            <Button variant="outline" className="!text-xs" onClick={reconnect}>
+              Reconnect
+            </Button>
+          ) : null}
         </div>
-        {status !== 'open' ? (
-          <Button variant="outline" className="!text-xs" onClick={reconnect}>
-            Reconnect
-          </Button>
-        ) : null}
+        <div ref={containerRef} className="min-h-[420px] flex-1 p-2" />
       </div>
-      <div ref={containerRef} className="min-h-[420px] flex-1 p-2" />
+      {notes.trim() ? (
+        <div className="rounded-lg border border-border bg-panel px-3 py-2">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">Notes</div>
+          <pre className="whitespace-pre-wrap font-mono text-xs text-dim">{notes}</pre>
+        </div>
+      ) : null}
     </div>
   )
 }

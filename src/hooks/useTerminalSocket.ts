@@ -6,6 +6,7 @@ export type TerminalConnStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'er
 
 interface UseTerminalSocketOptions {
   hostId: string | null
+  /** Connect only after xterm has been fitted (real cols/rows). */
   enabled?: boolean
   cols?: number
   rows?: number
@@ -14,7 +15,7 @@ interface UseTerminalSocketOptions {
 
 /**
  * Core PTY tunnel: WS /ws/pty/{host_id}?token=&cols=&rows=
- * Client sends raw bytes/text; agent frames arrive as binary or JSON.
+ * Stdin: raw text/binary. Resize: JSON {type:pty_resize,cols,rows} (no reconnect).
  */
 export function useTerminalSocket({
   hostId,
@@ -25,12 +26,31 @@ export function useTerminalSocket({
 }: UseTerminalSocketOptions) {
   const onDataRef = useRef(onData)
   onDataRef.current = onData
-  const [dims, setDims] = useState({ cols, rows })
+  const sessionIdRef = useRef<string | null>(null)
+  // Freeze geometry used in the connect URL so later fits don't reconnect.
+  const connectDimsRef = useRef<{ cols: number; rows: number } | null>(null)
+
+  useEffect(() => {
+    sessionIdRef.current = null
+    connectDimsRef.current = null
+  }, [hostId])
+
+  if (enabled && hostId && !connectDimsRef.current) {
+    connectDimsRef.current = {
+      cols: Math.max(1, cols),
+      rows: Math.max(1, rows),
+    }
+  }
+  if (!enabled) {
+    connectDimsRef.current = null
+    sessionIdRef.current = null
+  }
 
   const token = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+  const dim = connectDimsRef.current
   const wsUrl =
-    hostId && token && enabled
-      ? `${WS_BASE_URL}/pty/${hostId}?token=${encodeURIComponent(token)}&cols=${dims.cols}&rows=${dims.rows}`
+    hostId && token && enabled && dim
+      ? `${WS_BASE_URL}/pty/${hostId}?token=${encodeURIComponent(token)}&cols=${dim.cols}&rows=${dim.rows}`
       : null
 
   const onMessage = useCallback((event: MessageEvent) => {
@@ -38,10 +58,14 @@ export function useTerminalSocket({
       try {
         const msg = JSON.parse(event.data) as {
           type?: string
+          session_id?: string
           data?: string
           encoding?: string
         }
-        if (msg.type === 'pty_ready') return
+        if (msg.type === 'pty_ready') {
+          if (msg.session_id) sessionIdRef.current = msg.session_id
+          return
+        }
         if (msg.type === 'pty_data' && msg.data) {
           if (msg.encoding === 'base64') {
             onDataRef.current(atob(msg.data))
@@ -83,14 +107,22 @@ export function useTerminalSocket({
     [send],
   )
 
-  const resize = useCallback((nextCols: number, nextRows: number) => {
-    setDims({ cols: nextCols, rows: nextRows })
-  }, [])
-
-  // Reconnect when dims change significantly after session open is handled by URL change
-  useEffect(() => {
-    setDims({ cols, rows })
-  }, [hostId, cols, rows])
+  const resize = useCallback(
+    (nextCols: number, nextRows: number) => {
+      const c = Math.max(1, Math.floor(nextCols))
+      const r = Math.max(1, Math.floor(nextRows))
+      if (c < 1 || r < 1) return
+      send(
+        JSON.stringify({
+          type: 'pty_resize',
+          session_id: sessionIdRef.current,
+          cols: c,
+          rows: r,
+        }),
+      )
+    },
+    [send],
+  )
 
   const connStatus: TerminalConnStatus =
     !hostId || !enabled

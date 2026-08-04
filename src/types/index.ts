@@ -54,6 +54,7 @@ export interface Host {
   ip_address: string | null
   port: number
   username: string
+  notes: string | null
   is_proxy_enabled: boolean
   tags: Tag[]
   agent: Agent | null
@@ -66,6 +67,7 @@ export interface CreateHostPayload {
   ip_address?: string | null
   port: number
   username: string
+  notes?: string | null
   is_proxy_enabled?: boolean
 }
 
@@ -74,6 +76,7 @@ export interface UpdateHostPayload {
   ip_address?: string | null
   port?: number
   username?: string
+  notes?: string | null
 }
 
 /** Latest telemetry snapshot from Redis (TTL-backed). */

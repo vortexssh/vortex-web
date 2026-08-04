@@ -114,6 +114,7 @@ export const handlers = [
       ip_address: body.ip_address ?? null,
       port: body.port,
       username: body.username,
+      notes: body.notes ?? null,
       is_proxy_enabled: body.is_proxy_enabled ?? false,
       tags: [],
       agent: null,
@@ -134,6 +135,7 @@ export const handlers = [
       ip_address: body.ip_address === undefined ? host.ip_address : body.ip_address,
       port: body.port ?? host.port,
       username: body.username ?? host.username,
+      notes: body.notes === undefined ? host.notes : body.notes,
       updated_at: new Date().toISOString(),
     })
     return HttpResponse.json(host)

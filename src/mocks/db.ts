@@ -33,6 +33,7 @@ const hosts: Host[] = [
     ip_address: '10.0.12.8',
     port: 22,
     username: 'root',
+    notes: null,
     is_proxy_enabled: true,
     tags: [tags[0]!],
     agent: {
