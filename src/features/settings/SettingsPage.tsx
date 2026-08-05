@@ -14,7 +14,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Table } from '@/components/ui/Table'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/Toast'
-import type { TelegramLinkResponse } from '@/types'
+import type { NotificationSettings, TelegramLinkResponse } from '@/types'
 
 type SettingsTab =
   | 'profile'
@@ -210,11 +210,6 @@ function NotificationsSection() {
         </h2>
         <div className="flex flex-col gap-3">
           <Toggle
-            checked={s.billing_reminders_enabled}
-            onChange={(v) => saveMutation.mutate({ billing_reminders_enabled: v })}
-            label="Billing reminders master switch"
-          />
-          <Toggle
             checked={s.email_enabled}
             onChange={(v) => saveMutation.mutate({ email_enabled: v })}
             label="Email"
@@ -233,6 +228,111 @@ function NotificationsSection() {
             checked={s.client_enabled}
             onChange={(v) => saveMutation.mutate({ client_enabled: v })}
             label="Client / TUI inbox"
+          />
+        </div>
+      </section>
+
+      <EventToggleGroup
+        title="Security"
+        onToggle={(key, v) => saveMutation.mutate({ [key]: v })}
+        items={[
+          { key: 'notify_login', label: 'Sign-in to the panel', checked: s.notify_login },
+          {
+            key: 'notify_password_changed',
+            label: 'Password changed',
+            checked: s.notify_password_changed,
+          },
+          { key: 'notify_2fa_enabled', label: '2FA enabled', checked: s.notify_2fa_enabled },
+          { key: 'notify_2fa_disabled', label: '2FA disabled', checked: s.notify_2fa_disabled },
+        ]}
+      />
+
+      <EventToggleGroup
+        title="Account"
+        onToggle={(key, v) => saveMutation.mutate({ [key]: v })}
+        items={[
+          {
+            key: 'notify_profile_updated',
+            label: 'Profile updated',
+            checked: s.notify_profile_updated,
+          },
+          {
+            key: 'notify_telegram_linked',
+            label: 'Telegram linked',
+            checked: s.notify_telegram_linked,
+          },
+          {
+            key: 'notify_telegram_unlinked',
+            label: 'Telegram unlinked',
+            checked: s.notify_telegram_unlinked,
+          },
+        ]}
+      />
+
+      <EventToggleGroup
+        title="Hosts & agents"
+        onToggle={(key, v) => saveMutation.mutate({ [key]: v })}
+        items={[
+          { key: 'notify_host_created', label: 'Host created', checked: s.notify_host_created },
+          { key: 'notify_host_updated', label: 'Host updated', checked: s.notify_host_updated },
+          { key: 'notify_host_deleted', label: 'Host deleted', checked: s.notify_host_deleted },
+          {
+            key: 'notify_agent_created',
+            label: 'Agent enrolled',
+            checked: s.notify_agent_created,
+          },
+          {
+            key: 'notify_agent_rotated',
+            label: 'Agent secret rotated',
+            checked: s.notify_agent_rotated,
+          },
+          {
+            key: 'notify_agent_revoked',
+            label: 'Agent revoked',
+            checked: s.notify_agent_revoked,
+          },
+        ]}
+      />
+
+      <EventToggleGroup
+        title="API keys & tasks"
+        onToggle={(key, v) => saveMutation.mutate({ [key]: v })}
+        items={[
+          {
+            key: 'notify_api_key_created',
+            label: 'API key created',
+            checked: s.notify_api_key_created,
+          },
+          {
+            key: 'notify_api_key_deleted',
+            label: 'API key deleted',
+            checked: s.notify_api_key_deleted,
+          },
+          { key: 'notify_task_created', label: 'Task created', checked: s.notify_task_created },
+          { key: 'notify_task_updated', label: 'Task updated', checked: s.notify_task_updated },
+          { key: 'notify_task_deleted', label: 'Task deleted', checked: s.notify_task_deleted },
+        ]}
+      />
+
+      <section className="rounded-lg border border-border bg-panel p-4">
+        <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+          Billing
+        </h2>
+        <div className="flex flex-col gap-3">
+          <Toggle
+            checked={s.billing_reminders_enabled}
+            onChange={(v) => saveMutation.mutate({ billing_reminders_enabled: v })}
+            label="Renewal reminders"
+          />
+          <Toggle
+            checked={s.notify_billing_advanced}
+            onChange={(v) => saveMutation.mutate({ notify_billing_advanced: v })}
+            label="Manual billing advance"
+          />
+          <Toggle
+            checked={s.notify_billing_auto_renewed}
+            onChange={(v) => saveMutation.mutate({ notify_billing_auto_renewed: v })}
+            label="Auto-renewed period"
           />
         </div>
         <div className="mt-4">
@@ -303,6 +403,32 @@ function NotificationsSection() {
         ) : null}
       </section>
     </div>
+  )
+}
+
+function EventToggleGroup({
+  title,
+  items,
+  onToggle,
+}: {
+  title: string
+  items: { key: keyof NotificationSettings; label: string; checked: boolean }[]
+  onToggle: (key: keyof NotificationSettings, value: boolean) => void
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-panel p-4">
+      <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">{title}</h2>
+      <div className="flex flex-col gap-3">
+        {items.map((item) => (
+          <Toggle
+            key={item.key}
+            checked={item.checked}
+            onChange={(v) => onToggle(item.key, v)}
+            label={item.label}
+          />
+        ))}
+      </div>
+    </section>
   )
 }
 

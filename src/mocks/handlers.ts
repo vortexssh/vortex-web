@@ -20,6 +20,35 @@ function bad(message: string, code = 'BAD_REQUEST', status = 400) {
   return HttpResponse.json({ error: { code, message } }, { status })
 }
 
+const defaultNotificationSettings = {
+  email_enabled: true,
+  telegram_enabled: true,
+  in_app_enabled: true,
+  client_enabled: true,
+  reminder_offsets_days: [7, 3, 1, 0],
+  billing_reminders_enabled: true,
+  notify_login: true,
+  notify_password_changed: true,
+  notify_2fa_enabled: true,
+  notify_2fa_disabled: true,
+  notify_profile_updated: true,
+  notify_telegram_linked: true,
+  notify_telegram_unlinked: true,
+  notify_host_created: true,
+  notify_host_updated: true,
+  notify_host_deleted: true,
+  notify_agent_created: true,
+  notify_agent_rotated: true,
+  notify_agent_revoked: true,
+  notify_api_key_created: true,
+  notify_api_key_deleted: true,
+  notify_task_created: true,
+  notify_task_updated: true,
+  notify_task_deleted: true,
+  notify_billing_advanced: true,
+  notify_billing_auto_renewed: true,
+}
+
 export const handlers = [
   http.post('/api/v1/auth/register', async ({ request }) => {
     const body = (await request.json()) as { email?: string; password?: string }
@@ -598,28 +627,13 @@ export const handlers = [
 
   http.get('/api/v1/users/me/notification-settings', ({ request }) => {
     if (!authUser(request)) return unauthorized()
-    return HttpResponse.json({
-      email_enabled: true,
-      telegram_enabled: true,
-      in_app_enabled: true,
-      client_enabled: true,
-      reminder_offsets_days: [7, 3, 1, 0],
-      billing_reminders_enabled: true,
-    })
+    return HttpResponse.json({ ...defaultNotificationSettings })
   }),
 
   http.patch('/api/v1/users/me/notification-settings', async ({ request }) => {
     if (!authUser(request)) return unauthorized()
     const body = (await request.json()) as Record<string, unknown>
-    return HttpResponse.json({
-      email_enabled: true,
-      telegram_enabled: true,
-      in_app_enabled: true,
-      client_enabled: true,
-      reminder_offsets_days: [7, 3, 1, 0],
-      billing_reminders_enabled: true,
-      ...body,
-    })
+    return HttpResponse.json({ ...defaultNotificationSettings, ...body })
   }),
 
   http.get('/api/v1/users/me/telegram', ({ request }) => {

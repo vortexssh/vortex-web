@@ -123,6 +123,26 @@ export interface NotificationSettings {
   client_enabled: boolean
   reminder_offsets_days: number[]
   billing_reminders_enabled: boolean
+  notify_login: boolean
+  notify_password_changed: boolean
+  notify_2fa_enabled: boolean
+  notify_2fa_disabled: boolean
+  notify_profile_updated: boolean
+  notify_telegram_linked: boolean
+  notify_telegram_unlinked: boolean
+  notify_host_created: boolean
+  notify_host_updated: boolean
+  notify_host_deleted: boolean
+  notify_agent_created: boolean
+  notify_agent_rotated: boolean
+  notify_agent_revoked: boolean
+  notify_api_key_created: boolean
+  notify_api_key_deleted: boolean
+  notify_task_created: boolean
+  notify_task_updated: boolean
+  notify_task_deleted: boolean
+  notify_billing_advanced: boolean
+  notify_billing_auto_renewed: boolean
 }
 
 export interface AppNotification {
