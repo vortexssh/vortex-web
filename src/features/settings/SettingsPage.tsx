@@ -121,7 +121,7 @@ function BillingPrefsSection() {
         Account currency
       </h2>
       <p className="mb-4 text-sm text-dim">
-        Spend summaries and calendar convert host bills into this currency (Frankfurter / ECB).
+        Spend summaries and calendar convert host bills into this currency (Frankfurter rates).
       </p>
       <form
         className="flex max-w-xs flex-col gap-3"
