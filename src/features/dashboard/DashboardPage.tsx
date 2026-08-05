@@ -173,7 +173,7 @@ function HostPicker({
         ))}
       </select>
       <span className="font-mono text-[10px] text-muted">
-        Redis snapshot · poll 5s (Core does not store metric history)
+        Redis history · poll 5s
       </span>
     </div>
   )

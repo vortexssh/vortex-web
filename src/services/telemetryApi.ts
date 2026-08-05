@@ -5,6 +5,10 @@ export const telemetryApi = {
   get(hostId: string): Promise<TelemetrySnapshot> {
     return apiRequest<TelemetrySnapshot>(`/hosts/${hostId}/telemetry`)
   },
+
+  history(hostId: string): Promise<TelemetrySnapshot[]> {
+    return apiRequest<TelemetrySnapshot[]>(`/hosts/${hostId}/telemetry/history`)
+  },
 }
 
 export const apiKeysApi = {

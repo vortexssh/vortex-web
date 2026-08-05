@@ -375,6 +375,12 @@ export const handlers = [
     return HttpResponse.json(snap)
   }),
 
+  http.get('/api/v1/hosts/:id/telemetry/history', ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const snap = db.telemetryByHost[String(params.id)]
+    return HttpResponse.json(snap ? [snap] : [])
+  }),
+
   http.get('/api/v1/tags', ({ request }) => {
     if (!authUser(request)) return unauthorized()
     return HttpResponse.json(db.tags)
