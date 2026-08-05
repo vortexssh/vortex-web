@@ -290,7 +290,11 @@ function NotificationsSection() {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => window.location.assign(pendingLink.tg_link)}
+                onClick={() =>
+                  window.location.assign(
+                    pendingLink.tg_link ?? pendingLink.deep_link,
+                  )
+                }
               >
                 Open app again
               </Button>
