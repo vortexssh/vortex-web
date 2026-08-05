@@ -47,7 +47,11 @@ export const authApi = {
     return apiRequest<User>('/users/me')
   },
 
-  updateMe(payload: { email?: string; public_slug?: string | null }): Promise<User> {
+  updateMe(payload: {
+    email?: string
+    public_slug?: string | null
+    preferred_currency?: string
+  }): Promise<User> {
     return apiRequest<User>('/users/me', { method: 'PATCH', body: payload })
   },
 

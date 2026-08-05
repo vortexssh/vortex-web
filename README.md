@@ -49,6 +49,7 @@ Each user can publish a chrome-free fleet page at `/u/{slug}` (set slug in Setti
 - Hosts with **Hidden** enabled are omitted.
 - Telemetry polls `GET /api/v1/public/u/{slug}` every 5s.
 - Country flags use `hosts.country_code`, auto-filled from the host IP on save and from the agent IP when it connects.
+- **Billing**: optional renewal tracking per host, calendar/spend at `/billing`, reminders via email / Telegram / bell inbox (Settings → Notifications).
 
 Example reverse-proxy of a single status page:
 

@@ -24,6 +24,9 @@ const TasksPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
+const BillingPage = lazy(() =>
+  import('@/features/billing/BillingPage').then((m) => ({ default: m.BillingPage })),
+)
 const PublicStatusPage = lazy(() =>
   import('@/features/status/PublicStatusPage').then((m) => ({ default: m.PublicStatusPage })),
 )
@@ -102,6 +105,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageFallback />}>
                     <HostsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="billing"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <BillingPage />
                   </Suspense>
                 }
               />

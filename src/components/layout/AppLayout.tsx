@@ -14,6 +14,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Host Manager',
     subtitle: 'Inventory · tags · SSH proxy via agent',
   },
+  '/billing': {
+    title: 'Billing',
+    subtitle: 'Renewals calendar · spend in account currency',
+  },
   '/terminal': {
     title: 'Web Terminal',
     subtitle: 'Agent-backed shell · no credentials in browser',
@@ -28,7 +32,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   },
   '/settings': {
     title: 'Settings',
-    subtitle: 'Profile · security · appearance · API keys',
+    subtitle: 'Profile · billing · notifications · security',
   },
 }
 

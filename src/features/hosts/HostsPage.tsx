@@ -5,7 +5,7 @@ import { hostsApi } from '@/services/hostsApi'
 import { tagsApi } from '@/services/tagsApi'
 import { agentsApi } from '@/services/agentsApi'
 import { ApiError } from '@/services/apiClient'
-import type { CreateHostPayload, Host } from '@/types'
+import type { BillingCycle, CreateHostPayload, Host } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -432,9 +432,57 @@ function HostEditorModal({
   const [tagIds, setTagIds] = useState<string[]>(host?.tags.map((t) => t.id) ?? [])
   const [newTagName, setNewTagName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [billingEnabled, setBillingEnabled] = useState(host?.billing_enabled ?? false)
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(
+    host?.billing_cycle ?? 'monthly',
+  )
+  const [billingCustomDays, setBillingCustomDays] = useState(
+    String(host?.billing_custom_days ?? 30),
+  )
+  const [billingRenewalAt, setBillingRenewalAt] = useState(
+    host?.billing_renewal_at ?? '',
+  )
+  const [billingAmount, setBillingAmount] = useState(
+    host?.billing_amount != null ? String(host.billing_amount) : '',
+  )
+  const [billingCurrency, setBillingCurrency] = useState(
+    host?.billing_currency ?? 'USD',
+  )
+  const [billingAutoRenew, setBillingAutoRenew] = useState(
+    host?.billing_auto_renew ?? true,
+  )
+  const [billingNotes, setBillingNotes] = useState(host?.billing_notes ?? '')
+
+  const advanceMutation = useMutation({
+    mutationFn: () => {
+      if (!host) throw new Error('no host')
+      return hostsApi.advanceBilling(host.id)
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['hosts'] })
+      toast('Renewal advanced to next period', 'success')
+      onClose()
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Advance failed', 'error'),
+  })
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const billingPayload = billingEnabled
+        ? {
+            billing_enabled: true,
+            billing_cycle: billingCycle,
+            billing_custom_days:
+              billingCycle === 'custom' ? Number(billingCustomDays) : null,
+            billing_renewal_at: billingRenewalAt || null,
+            billing_amount: billingAmount ? billingAmount : null,
+            billing_currency: billingCurrency.toUpperCase(),
+            billing_auto_renew: billingAutoRenew,
+            billing_notes: billingNotes.trim() ? billingNotes.trim() : null,
+          }
+        : { billing_enabled: false }
+
       const payload: CreateHostPayload = {
         name,
         ip_address: ip.trim() ? ip.trim() : null,
@@ -442,6 +490,7 @@ function HostEditorModal({
         username,
         notes: notes.trim() ? notes : null,
         ...(host ? {} : { is_proxy_enabled: proxy }),
+        ...billingPayload,
       }
 
       let saved: Host
@@ -452,6 +501,7 @@ function HostEditorModal({
           port: payload.port,
           username: payload.username,
           notes: payload.notes,
+          ...billingPayload,
         })
         if (proxy !== host.is_proxy_enabled) {
           saved = await hostsApi.setProxy(host.id, proxy)
@@ -468,6 +518,7 @@ function HostEditorModal({
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })
       void qc.invalidateQueries({ queryKey: ['tags'] })
+      void qc.invalidateQueries({ queryKey: ['billing'] })
       toast(host ? 'Host updated' : 'Host created', 'success')
       onClose()
     },
@@ -547,6 +598,89 @@ function HostEditorModal({
           onChange={setProxy}
           label="SSH Proxy via Agent (for NAT / firewall)"
         />
+
+        <div className="rounded-md border border-border bg-panel/50 p-3">
+          <Toggle
+            checked={billingEnabled}
+            onChange={setBillingEnabled}
+            label="Track renewal / billing"
+          />
+          {billingEnabled ? (
+            <div className="mt-3 flex flex-col gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs uppercase tracking-wider text-muted">Cycle</span>
+                <select
+                  className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong"
+                  value={billingCycle}
+                  onChange={(e) => setBillingCycle(e.target.value as BillingCycle)}
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="semiannual">Semiannual</option>
+                  <option value="annual">Annual</option>
+                  <option value="custom">Custom days</option>
+                </select>
+              </label>
+              {billingCycle === 'custom' ? (
+                <Input
+                  label="Custom days"
+                  type="number"
+                  min={1}
+                  value={billingCustomDays}
+                  onChange={(e) => setBillingCustomDays(e.target.value)}
+                  required
+                />
+              ) : null}
+              <Input
+                label="Next renewal"
+                type="date"
+                value={billingRenewalAt}
+                onChange={(e) => setBillingRenewalAt(e.target.value)}
+                required
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Amount"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={billingAmount}
+                  onChange={(e) => setBillingAmount(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Currency"
+                  value={billingCurrency}
+                  onChange={(e) => setBillingCurrency(e.target.value.toUpperCase())}
+                  maxLength={3}
+                  required
+                />
+              </div>
+              <Toggle
+                checked={billingAutoRenew}
+                onChange={setBillingAutoRenew}
+                label="Auto-advance when overdue & agent online"
+              />
+              <Input
+                label="Billing notes"
+                value={billingNotes}
+                onChange={(e) => setBillingNotes(e.target.value)}
+                placeholder="provider, invoice ref…"
+              />
+              {host?.billing_enabled ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={advanceMutation.isPending}
+                  onClick={() => advanceMutation.mutate()}
+                >
+                  Advance to next period
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
         <div>
           <div className="mb-1 text-xs uppercase tracking-wider text-muted">Tags</div>
           <div className="flex flex-wrap gap-2">

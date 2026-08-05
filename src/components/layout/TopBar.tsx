@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
-import { Bell, LogOut, Search } from 'lucide-react'
+import { LogOut, Search } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/services/authApi'
 import { Button } from '@/components/ui/Button'
+import { NotificationBell } from '@/components/layout/NotificationBell'
 
 interface TopBarProps {
   title: string
@@ -47,13 +48,7 @@ export function TopBar({ title, subtitle, menuSlot }: TopBarProps) {
           />
         </div>
 
-        <button
-          type="button"
-          className="rounded-md border border-border p-2 text-dim transition-colors hover:border-neon/40 hover:text-neon"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-        </button>
+        <NotificationBell />
 
         <div className="flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5">
           <span

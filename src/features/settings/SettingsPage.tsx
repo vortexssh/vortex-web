@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/services/authApi'
+import { billingApi } from '@/services/billingApi'
 import { apiKeysApi } from '@/services/telemetryApi'
 import { ApiError } from '@/services/apiClient'
 import { useAuthStore } from '@/store/authStore'
@@ -11,12 +12,21 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Table } from '@/components/ui/Table'
+import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/Toast'
 
-type SettingsTab = 'profile' | 'security' | 'appearance' | 'api-keys'
+type SettingsTab =
+  | 'profile'
+  | 'billing'
+  | 'notifications'
+  | 'security'
+  | 'appearance'
+  | 'api-keys'
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'profile', label: 'Profile' },
+  { id: 'billing', label: 'Billing' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'security', label: 'Security' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'api-keys', label: 'API keys' },
@@ -46,10 +56,209 @@ export function SettingsPage() {
 
       <div className="min-w-0 flex-1">
         {tab === 'profile' ? <ProfileSection /> : null}
+        {tab === 'billing' ? <BillingPrefsSection /> : null}
+        {tab === 'notifications' ? <NotificationsSection /> : null}
         {tab === 'security' ? <SecuritySection /> : null}
         {tab === 'appearance' ? <AppearanceSection /> : null}
         {tab === 'api-keys' ? <ApiKeysSection /> : null}
       </div>
+    </div>
+  )
+}
+
+function OffsetsEditor({
+  initial,
+  onSave,
+}: {
+  initial: number[]
+  onSave: (parts: number[]) => void
+}) {
+  const [value, setValue] = useState(initial.join(', '))
+  return (
+    <div>
+      <label className="text-xs uppercase tracking-wider text-muted">
+        Reminder offsets (days before renewal)
+      </label>
+      <Input
+        className="mt-1"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          const parts = value
+            .split(/[,\s]+/)
+            .map((x) => Number(x.trim()))
+            .filter((n) => Number.isFinite(n) && n >= 0)
+          if (parts.length) onSave(parts)
+        }}
+        placeholder="7, 3, 1, 0"
+      />
+      <p className="mt-1 font-mono text-[10px] text-muted">
+        Edit and blur to save. Example: 7, 3, 1, 0
+      </p>
+    </div>
+  )
+}
+
+function BillingPrefsSection() {
+  const user = useAuthStore((s) => s.user)
+  const setUser = useAuthStore((s) => s.setUser)
+  const [currency, setCurrency] = useState(user?.preferred_currency ?? 'USD')
+
+  const mutation = useMutation({
+    mutationFn: () => authApi.updateMe({ preferred_currency: currency.toUpperCase() }),
+    onSuccess: (u) => {
+      setUser(u)
+      toast('Preferred currency saved', 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Update failed', 'error'),
+  })
+
+  return (
+    <section className="rounded-lg border border-border bg-panel p-4">
+      <h2 className="mb-1 font-mono text-xs uppercase tracking-wider text-muted">
+        Account currency
+      </h2>
+      <p className="mb-4 text-sm text-dim">
+        Spend summaries and calendar convert host bills into this currency (Frankfurter / ECB).
+      </p>
+      <form
+        className="flex max-w-xs flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          mutation.mutate()
+        }}
+      >
+        <Input
+          label="Preferred currency (ISO 4217)"
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+          maxLength={3}
+          required
+        />
+        <Button type="submit" disabled={mutation.isPending}>
+          Save
+        </Button>
+      </form>
+    </section>
+  )
+}
+
+function NotificationsSection() {
+  const settingsQuery = useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: () => billingApi.getNotificationSettings(),
+  })
+  const tgQuery = useQuery({
+    queryKey: ['telegram-status'],
+    queryFn: () => billingApi.telegramStatus(),
+  })
+  const qc = useQueryClient()
+  const s = settingsQuery.data
+
+  const saveMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof billingApi.updateNotificationSettings>[0]) =>
+      billingApi.updateNotificationSettings(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['notification-settings'] })
+      toast('Notification settings saved', 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Save failed', 'error'),
+  })
+
+  const linkMutation = useMutation({
+    mutationFn: () => billingApi.telegramLink(),
+    onSuccess: (res) => {
+      void qc.invalidateQueries({ queryKey: ['telegram-status'] })
+      window.open(res.deep_link, '_blank', 'noopener,noreferrer')
+      toast(`Opened Telegram · code ${res.code}`, 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Link failed', 'error'),
+  })
+
+  const unlinkMutation = useMutation({
+    mutationFn: () => billingApi.telegramUnlink(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['telegram-status'] })
+      toast('Telegram unlinked', 'success')
+    },
+  })
+
+  if (!s) {
+    return <p className="font-mono text-xs text-muted">loading…</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <section className="rounded-lg border border-border bg-panel p-4">
+        <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+          Channels
+        </h2>
+        <div className="flex flex-col gap-3">
+          <Toggle
+            checked={s.billing_reminders_enabled}
+            onChange={(v) => saveMutation.mutate({ billing_reminders_enabled: v })}
+            label="Billing reminders master switch"
+          />
+          <Toggle
+            checked={s.email_enabled}
+            onChange={(v) => saveMutation.mutate({ email_enabled: v })}
+            label="Email"
+          />
+          <Toggle
+            checked={s.telegram_enabled}
+            onChange={(v) => saveMutation.mutate({ telegram_enabled: v })}
+            label="Telegram"
+          />
+          <Toggle
+            checked={s.in_app_enabled}
+            onChange={(v) => saveMutation.mutate({ in_app_enabled: v })}
+            label="In-app (bell)"
+          />
+          <Toggle
+            checked={s.client_enabled}
+            onChange={(v) => saveMutation.mutate({ client_enabled: v })}
+            label="Client / TUI inbox"
+          />
+        </div>
+        <div className="mt-4">
+          <OffsetsEditor
+            key={s.reminder_offsets_days.join('-')}
+            initial={s.reminder_offsets_days}
+            onSave={(parts) => saveMutation.mutate({ reminder_offsets_days: parts })}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-panel p-4">
+        <h2 className="mb-1 font-mono text-xs uppercase tracking-wider text-muted">
+          Telegram
+        </h2>
+        <p className="mb-3 text-sm text-dim">
+          {tgQuery.data?.linked
+            ? `Linked${tgQuery.data.bot_username ? ` via @${tgQuery.data.bot_username}` : ''}`
+            : 'Not linked — generate a deep link to connect the official bot.'}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={linkMutation.isPending}
+            onClick={() => linkMutation.mutate()}
+          >
+            {tgQuery.data?.linked ? 'Re-link' : 'Link Telegram'}
+          </Button>
+          {tgQuery.data?.linked ? (
+            <Button
+              variant="ghost"
+              disabled={unlinkMutation.isPending}
+              onClick={() => unlinkMutation.mutate()}
+            >
+              Unlink
+            </Button>
+          ) : null}
+        </div>
+      </section>
     </div>
   )
 }

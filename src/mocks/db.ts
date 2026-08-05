@@ -38,6 +38,14 @@ const hosts: Host[] = [
     sort_order: 0,
     is_hidden: false,
     is_proxy_enabled: true,
+    billing_enabled: false,
+    billing_cycle: null,
+    billing_custom_days: null,
+    billing_renewal_at: null,
+    billing_amount: null,
+    billing_currency: null,
+    billing_auto_renew: true,
+    billing_notes: null,
     tags: [tags[0]!],
     agent: {
       id: 'agt_edge_01',
@@ -78,6 +86,8 @@ let user: DbUser = {
   is_2fa_enabled: false,
   is_email_verified: true,
   is_active: true,
+  preferred_currency: 'USD',
+  telegram_linked: false,
   totp_secret: null,
   created_at: now(),
 }
@@ -98,6 +108,8 @@ export const db = {
     is_2fa_enabled: user.is_2fa_enabled,
     is_email_verified: user.is_email_verified,
     is_active: user.is_active,
+    preferred_currency: user.preferred_currency,
+    telegram_linked: user.telegram_linked,
     created_at: user.created_at,
   }),
   issueVerificationToken: (userId: string) => {

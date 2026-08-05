@@ -60,4 +60,8 @@ export const hostsApi = {
       body: { tag_ids },
     })
   },
+
+  advanceBilling(hostId: string): Promise<Host> {
+    return apiRequest<Host>(`/hosts/${hostId}/billing/advance`, { method: 'POST' })
+  },
 }

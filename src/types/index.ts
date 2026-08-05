@@ -5,7 +5,22 @@ export interface User {
   is_2fa_enabled: boolean
   is_email_verified: boolean
   is_active: boolean
+  preferred_currency: string
+  telegram_linked: boolean
   created_at: string
+}
+
+export type BillingCycle = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'custom'
+
+export interface HostBillingFields {
+  billing_enabled?: boolean
+  billing_cycle?: BillingCycle | null
+  billing_custom_days?: number | null
+  billing_renewal_at?: string | null
+  billing_amount?: string | number | null
+  billing_currency?: string | null
+  billing_auto_renew?: boolean
+  billing_notes?: string | null
 }
 
 export interface RegisterResponse {
@@ -66,13 +81,21 @@ export interface Host {
   sort_order: number
   is_hidden: boolean
   is_proxy_enabled: boolean
+  billing_enabled: boolean
+  billing_cycle: BillingCycle | null
+  billing_custom_days: number | null
+  billing_renewal_at: string | null
+  billing_amount: string | null
+  billing_currency: string | null
+  billing_auto_renew: boolean
+  billing_notes: string | null
   tags: Tag[]
   agent: Agent | null
   created_at: string
   updated_at: string
 }
 
-export interface CreateHostPayload {
+export interface CreateHostPayload extends HostBillingFields {
   name: string
   ip_address?: string | null
   port: number
@@ -83,7 +106,7 @@ export interface CreateHostPayload {
   is_proxy_enabled?: boolean
 }
 
-export interface UpdateHostPayload {
+export interface UpdateHostPayload extends HostBillingFields {
   name?: string
   ip_address?: string | null
   port?: number
@@ -91,6 +114,80 @@ export interface UpdateHostPayload {
   notes?: string | null
   country_code?: string | null
   is_hidden?: boolean
+}
+
+export interface NotificationSettings {
+  email_enabled: boolean
+  telegram_enabled: boolean
+  in_app_enabled: boolean
+  client_enabled: boolean
+  reminder_offsets_days: number[]
+  billing_reminders_enabled: boolean
+}
+
+export interface AppNotification {
+  id: string
+  host_id: string | null
+  kind: string
+  title: string
+  body: string
+  payload?: Record<string, unknown> | null
+  read_at: string | null
+  created_at: string
+}
+
+export interface TelegramStatus {
+  linked: boolean
+  chat_id: string | null
+  linked_at: string | null
+  bot_username: string | null
+}
+
+export interface TelegramLinkResponse {
+  code: string
+  deep_link: string
+  expires_at: string
+  bot_username: string | null
+}
+
+export interface BillingHostBrief {
+  id: string
+  name: string
+  billing_amount: string | null
+  billing_currency: string | null
+  amount_converted: string | null
+  country_code: string | null
+}
+
+export interface BillingDay {
+  date: string
+  hosts: BillingHostBrief[]
+}
+
+export interface BillingCalendarResponse {
+  year: number
+  month: number
+  currency: string
+  days: BillingDay[]
+}
+
+export interface BillingSummaryItem {
+  host_id: string
+  host_name: string
+  amount: string
+  currency: string
+  amount_converted: string | null
+  renewal_at: string | null
+  cycle: string | null
+}
+
+export interface BillingSummaryResponse {
+  currency: string
+  from_date: string
+  to_date: string
+  total: string
+  items: BillingSummaryItem[]
+  skipped: string[]
 }
 
 /** Public status page (no IPs / SSH metadata). */

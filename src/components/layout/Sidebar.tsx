@@ -9,12 +9,14 @@ import {
   Settings,
   X,
   Lock,
+  Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, needs2fa: true },
   { to: '/hosts', label: 'Hosts', icon: Server, needs2fa: false },
+  { to: '/billing', label: 'Billing', icon: Wallet, needs2fa: false },
   { to: '/terminal', label: 'WebSSH', icon: Terminal, needs2fa: true },
   { to: '/tasks', label: 'Tasks', icon: Clock, needs2fa: true },
   { to: '/security/2fa', label: '2FA Setup', icon: ShieldCheck, needs2fa: false },

@@ -107,13 +107,20 @@ export const handlers = [
   http.patch('/api/v1/users/me', async ({ request }) => {
     const user = authUser(request)
     if (!user) return unauthorized()
-    const body = (await request.json()) as { email?: string; public_slug?: string | null }
+    const body = (await request.json()) as {
+      email?: string
+      public_slug?: string | null
+      preferred_currency?: string
+    }
     const dbUser = db.getUser()
     db.setUser({
       ...dbUser,
       ...(body.email ? { email: body.email } : {}),
       ...(body.public_slug !== undefined
         ? { public_slug: body.public_slug?.trim() ? body.public_slug.trim().toLowerCase() : null }
+        : {}),
+      ...(body.preferred_currency
+        ? { preferred_currency: body.preferred_currency.toUpperCase() }
         : {}),
     })
     return HttpResponse.json(db.publicUser())
@@ -203,6 +210,15 @@ export const handlers = [
       username: body.username,
       notes: body.notes ?? null,
       country_code: mockCountryFromIp(ip),
+      billing_enabled: body.billing_enabled ?? false,
+      billing_cycle: body.billing_cycle ?? null,
+      billing_custom_days: body.billing_custom_days ?? null,
+      billing_renewal_at: body.billing_renewal_at ?? null,
+      billing_amount:
+        body.billing_amount != null ? String(body.billing_amount) : null,
+      billing_currency: body.billing_currency ?? null,
+      billing_auto_renew: body.billing_auto_renew ?? true,
+      billing_notes: body.billing_notes ?? null,
       is_hidden: body.is_hidden ?? false,
       sort_order: db.hosts.length,
       is_proxy_enabled: body.is_proxy_enabled ?? false,
@@ -229,6 +245,34 @@ export const handlers = [
       notes: body.notes === undefined ? host.notes : body.notes,
       country_code: mockCountryFromIp(ip),
       is_hidden: body.is_hidden === undefined ? host.is_hidden : body.is_hidden,
+      billing_enabled:
+        body.billing_enabled === undefined ? host.billing_enabled : body.billing_enabled,
+      billing_cycle:
+        body.billing_cycle === undefined ? host.billing_cycle : body.billing_cycle,
+      billing_custom_days:
+        body.billing_custom_days === undefined
+          ? host.billing_custom_days
+          : body.billing_custom_days,
+      billing_renewal_at:
+        body.billing_renewal_at === undefined
+          ? host.billing_renewal_at
+          : body.billing_renewal_at,
+      billing_amount:
+        body.billing_amount === undefined
+          ? host.billing_amount
+          : body.billing_amount != null
+            ? String(body.billing_amount)
+            : null,
+      billing_currency:
+        body.billing_currency === undefined
+          ? host.billing_currency
+          : body.billing_currency,
+      billing_auto_renew:
+        body.billing_auto_renew === undefined
+          ? host.billing_auto_renew
+          : body.billing_auto_renew,
+      billing_notes:
+        body.billing_notes === undefined ? host.billing_notes : body.billing_notes,
       updated_at: new Date().toISOString(),
     })
     return HttpResponse.json(host)
@@ -480,6 +524,135 @@ export const handlers = [
         }
       })
     return HttpResponse.json({ slug: u.public_slug, hosts })
+  }),
+
+  http.get('/api/v1/billing/calendar', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    const url = new URL(request.url)
+    const year = Number(url.searchParams.get('year'))
+    const month = Number(url.searchParams.get('month'))
+    const days = db.hosts
+      .filter((h) => h.billing_enabled && h.billing_renewal_at)
+      .filter((h) => {
+        const d = h.billing_renewal_at!
+        return d.startsWith(`${year}-${String(month).padStart(2, '0')}`)
+      })
+      .map((h) => ({
+        date: h.billing_renewal_at!,
+        hosts: [
+          {
+            id: h.id,
+            name: h.name,
+            billing_amount: h.billing_amount,
+            billing_currency: h.billing_currency,
+            amount_converted: h.billing_amount,
+            country_code: h.country_code,
+          },
+        ],
+      }))
+    return HttpResponse.json({
+      year,
+      month,
+      currency: db.getUser().preferred_currency,
+      days,
+    })
+  }),
+
+  http.get('/api/v1/billing/summary', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    const items = db.hosts
+      .filter((h) => h.billing_enabled && h.billing_amount)
+      .map((h) => ({
+        host_id: h.id,
+        host_name: h.name,
+        amount: h.billing_amount!,
+        currency: h.billing_currency ?? 'USD',
+        amount_converted: h.billing_amount,
+        renewal_at: h.billing_renewal_at,
+        cycle: h.billing_cycle,
+      }))
+    const total = items.reduce((acc, i) => acc + Number(i.amount), 0)
+    const url = new URL(request.url)
+    return HttpResponse.json({
+      currency: db.getUser().preferred_currency,
+      from_date: url.searchParams.get('from'),
+      to_date: url.searchParams.get('to'),
+      total: total.toFixed(2),
+      items,
+      skipped: [],
+    })
+  }),
+
+  http.post('/api/v1/hosts/:id/billing/advance', ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const host = db.findHost(String(params.id))
+    if (!host) return bad('Host not found', 'host_not_found', 404)
+    if (!host.billing_renewal_at) return bad('Billing not configured', 'billing_not_configured')
+    const d = new Date(host.billing_renewal_at)
+    d.setMonth(d.getMonth() + 1)
+    host.billing_renewal_at = d.toISOString().slice(0, 10)
+    return HttpResponse.json(host)
+  }),
+
+  http.get('/api/v1/users/me/notification-settings', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return HttpResponse.json({
+      email_enabled: true,
+      telegram_enabled: true,
+      in_app_enabled: true,
+      client_enabled: true,
+      reminder_offsets_days: [7, 3, 1, 0],
+      billing_reminders_enabled: true,
+    })
+  }),
+
+  http.patch('/api/v1/users/me/notification-settings', async ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    const body = (await request.json()) as Record<string, unknown>
+    return HttpResponse.json({
+      email_enabled: true,
+      telegram_enabled: true,
+      in_app_enabled: true,
+      client_enabled: true,
+      reminder_offsets_days: [7, 3, 1, 0],
+      billing_reminders_enabled: true,
+      ...body,
+    })
+  }),
+
+  http.get('/api/v1/users/me/telegram', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return HttpResponse.json({
+      linked: false,
+      chat_id: null,
+      linked_at: null,
+      bot_username: 'VortexSSHBot',
+    })
+  }),
+
+  http.post('/api/v1/users/me/telegram/link', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return HttpResponse.json({
+      code: 'deadbeef',
+      deep_link: 'https://t.me/VortexSSHBot?start=deadbeef',
+      expires_at: new Date(Date.now() + 600_000).toISOString(),
+      bot_username: 'VortexSSHBot',
+    })
+  }),
+
+  http.delete('/api/v1/users/me/telegram', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get('/api/v1/notifications', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return HttpResponse.json([])
+  }),
+
+  http.post('/api/v1/notifications/read-all', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('/api/v1/health', () => HttpResponse.json({ status: 'ok' })),

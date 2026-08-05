@@ -1,0 +1,212 @@
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { billingApi } from '@/services/billingApi'
+import { countryFlag } from '@/lib/countryFlag'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+
+function monthLabel(year: number, month: number) {
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate()
+}
+
+function startWeekday(year: number, month: number) {
+  // Monday=0 … Sunday=6
+  const d = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
+  return (d + 6) % 7
+}
+
+export function BillingPage() {
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+
+  const from = `${year}-${String(month).padStart(2, '0')}-01`
+  const to = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth(year, month)).padStart(2, '0')}`
+
+  const calendarQuery = useQuery({
+    queryKey: ['billing', 'calendar', year, month],
+    queryFn: () => billingApi.calendar(year, month),
+  })
+  const summaryQuery = useQuery({
+    queryKey: ['billing', 'summary', from, to],
+    queryFn: () => billingApi.summary(from, to),
+  })
+
+  const byDate = useMemo(() => {
+    const map = new Map<string, typeof calendarQuery.data extends undefined ? never : NonNullable<typeof calendarQuery.data>['days'][0]['hosts']>()
+    for (const day of calendarQuery.data?.days ?? []) {
+      map.set(day.date, day.hosts)
+    }
+    return map
+  }, [calendarQuery.data])
+
+  function shiftMonth(delta: number) {
+    let m = month + delta
+    let y = year
+    if (m < 1) {
+      m = 12
+      y -= 1
+    } else if (m > 12) {
+      m = 1
+      y += 1
+    }
+    setYear(y)
+    setMonth(m)
+    setSelectedDay(null)
+  }
+
+  const totalDays = daysInMonth(year, month)
+  const pad = startWeekday(year, month)
+  const cells: Array<{ day: number | null; date: string | null }> = []
+  for (let i = 0; i < pad; i++) cells.push({ day: null, date: null })
+  for (let d = 1; d <= totalDays; d++) {
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    cells.push({ day: d, date })
+  }
+
+  const selectedHosts = selectedDay ? byDate.get(selectedDay) ?? [] : []
+  const currency = summaryQuery.data?.currency ?? calendarQuery.data?.currency ?? 'USD'
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="font-mono text-xs uppercase tracking-wider text-muted">Spend</h2>
+          <p className="mt-1 text-2xl font-semibold text-fg-strong">
+            {summaryQuery.data?.total ?? '—'}{' '}
+            <span className="font-mono text-base text-neon">{currency}</span>
+          </p>
+          <p className="mt-1 font-mono text-xs text-muted">
+            Renewals in {monthLabel(year, month)} · converted via Frankfurter
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => shiftMonth(-1)}>
+            ←
+          </Button>
+          <span className="min-w-[10rem] text-center font-mono text-sm text-fg-strong">
+            {monthLabel(year, month)}
+          </span>
+          <Button variant="ghost" onClick={() => shiftMonth(1)}>
+            →
+          </Button>
+        </div>
+      </div>
+
+      {(summaryQuery.data?.skipped.length ?? 0) > 0 ? (
+        <p className="font-mono text-xs text-warn">
+          Skipped FX: {summaryQuery.data!.skipped.join('; ')}
+        </p>
+      ) : null}
+
+      <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px] uppercase text-muted">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+          <div key={d} className="py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((cell, idx) => {
+          if (!cell.day || !cell.date) {
+            return <div key={`pad-${idx}`} className="min-h-16 rounded-md bg-transparent" />
+          }
+          const hosts = byDate.get(cell.date) ?? []
+          const active = selectedDay === cell.date
+          return (
+            <button
+              key={cell.date}
+              type="button"
+              onClick={() => setSelectedDay(cell.date)}
+              className={`min-h-16 rounded-md border p-1.5 text-left transition-colors ${
+                active
+                  ? 'border-neon/50 bg-neon/10'
+                  : hosts.length
+                    ? 'border-border-active bg-panel hover:border-neon/40'
+                    : 'border-border bg-surface hover:border-border-active'
+              }`}
+            >
+              <div className="font-mono text-xs text-dim">{cell.day}</div>
+              {hosts.length ? (
+                <div className="mt-1 flex flex-wrap gap-0.5">
+                  {hosts.slice(0, 3).map((h) => (
+                    <span key={h.id} title={h.name} className="text-sm leading-none">
+                      {countryFlag(h.country_code)}
+                    </span>
+                  ))}
+                  {hosts.length > 3 ? (
+                    <span className="font-mono text-[10px] text-muted">+{hosts.length - 3}</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+
+      <section className="rounded-lg border border-border bg-panel p-4">
+        <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+          {selectedDay ? `Due ${selectedDay}` : 'Select a day'}
+        </h3>
+        {!selectedDay ? (
+          <p className="text-sm text-dim">Click a marked day to see renewing hosts.</p>
+        ) : selectedHosts.length === 0 ? (
+          <p className="text-sm text-dim">No renewals this day.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {selectedHosts.map((h) => (
+              <li
+                key={h.id}
+                className="flex items-center justify-between gap-3 rounded-md border border-border bg-void px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{countryFlag(h.country_code)}</span>
+                  <span className="text-sm text-fg-strong">{h.name}</span>
+                </div>
+                <Badge tone="neon">
+                  {h.billing_amount} {h.billing_currency}
+                  {h.amount_converted != null
+                    ? ` · ${h.amount_converted} ${currency}`
+                    : ''}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {summaryQuery.data && summaryQuery.data.items.length > 0 ? (
+        <section className="rounded-lg border border-border bg-panel p-4">
+          <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+            Period items
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {summaryQuery.data.items.map((item) => (
+              <li
+                key={item.host_id}
+                className="flex justify-between gap-2 font-mono text-xs text-dim"
+              >
+                <span>{item.host_name}</span>
+                <span>
+                  {item.amount} {item.currency}
+                  {item.amount_converted != null
+                    ? ` → ${item.amount_converted} ${currency}`
+                    : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
+  )
+}
