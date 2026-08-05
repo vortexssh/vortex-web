@@ -14,6 +14,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Table } from '@/components/ui/Table'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/Toast'
+import type { TelegramLinkResponse } from '@/types'
 
 type SettingsTab =
   | 'profile'
@@ -167,12 +168,22 @@ function NotificationsSection() {
       toast(err instanceof ApiError ? err.message : 'Save failed', 'error'),
   })
 
+  const [pendingLink, setPendingLink] = useState<TelegramLinkResponse | null>(null)
+
   const linkMutation = useMutation({
     mutationFn: () => billingApi.telegramLink(),
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ['telegram-status'] })
-      window.open(res.deep_link, '_blank', 'noopener,noreferrer')
-      toast(`Opened Telegram · code ${res.code}`, 'success')
+      const tgLink =
+        res.tg_link ||
+        (res.bot_username
+          ? `tg://resolve?domain=${res.bot_username}&start=${res.code}`
+          : res.deep_link)
+      const link: TelegramLinkResponse = { ...res, tg_link: tgLink }
+      setPendingLink(link)
+      // Prefer tg:// — browsers often strip ?start= when t.me redirects to telegram.org.
+      window.location.assign(tgLink)
+      toast(`Open Telegram and press Start · code ${res.code}`, 'success')
     },
     onError: (err: unknown) =>
       toast(err instanceof ApiError ? err.message : 'Link failed', 'error'),
@@ -182,6 +193,7 @@ function NotificationsSection() {
     mutationFn: () => billingApi.telegramUnlink(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['telegram-status'] })
+      setPendingLink(null)
       toast('Telegram unlinked', 'success')
     },
   })
@@ -239,7 +251,7 @@ function NotificationsSection() {
         <p className="mb-3 text-sm text-dim">
           {tgQuery.data?.linked
             ? `Linked${tgQuery.data.bot_username ? ` via @${tgQuery.data.bot_username}` : ''}`
-            : 'Not linked — generate a deep link to connect the official bot.'}
+            : 'Not linked — open the bot in the Telegram app (not the browser).'}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -258,6 +270,33 @@ function NotificationsSection() {
             </Button>
           ) : null}
         </div>
+        {pendingLink ? (
+          <div className="mt-4 space-y-2 rounded border border-border bg-bg p-3 font-mono text-xs">
+            <p className="text-muted">
+              If Telegram did not open, copy the link into the app or send{' '}
+              <span className="text-primary">/start {pendingLink.code}</span> to @
+              {pendingLink.bot_username ?? 'the bot'}.
+            </p>
+            <p className="break-all text-dim">{pendingLink.deep_link}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  void navigator.clipboard.writeText(pendingLink.deep_link)
+                  toast('Link copied', 'success')
+                }}
+              >
+                Copy t.me link
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => window.location.assign(pendingLink.tg_link)}
+              >
+                Open app again
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   )

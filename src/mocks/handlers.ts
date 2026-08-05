@@ -637,6 +637,7 @@ export const handlers = [
     return HttpResponse.json({
       code: 'deadbeef',
       deep_link: 'https://t.me/VortexSSHBot?start=deadbeef',
+      tg_link: 'tg://resolve?domain=VortexSSHBot&start=deadbeef',
       expires_at: new Date(Date.now() + 600_000).toISOString(),
       bot_username: 'VortexSSHBot',
     })

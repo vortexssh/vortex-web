@@ -146,6 +146,8 @@ export interface TelegramStatus {
 export interface TelegramLinkResponse {
   code: string
   deep_link: string
+  /** Native Telegram protocol — prefer over t.me in browsers. */
+  tg_link?: string
   expires_at: string
   bot_username: string | null
 }
