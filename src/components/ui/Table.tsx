@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Fragment } from 'react'
 
 interface Column<T> {
   key: string
@@ -12,9 +13,20 @@ interface TableProps<T> {
   rows: T[]
   rowKey: (row: T) => string
   empty?: string
+  expandedKey?: string | null
+  onRowClick?: (row: T) => void
+  renderExpanded?: (row: T) => ReactNode
 }
 
-export function Table<T>({ columns, rows, rowKey, empty = 'No data' }: TableProps<T>) {
+export function Table<T>({
+  columns,
+  rows,
+  rowKey,
+  empty = 'No data',
+  expandedKey = null,
+  onRowClick,
+  renderExpanded,
+}: TableProps<T>) {
   if (rows.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-panel px-4 py-10 text-center text-sm text-muted">
@@ -36,18 +48,33 @@ export function Table<T>({ columns, rows, rowKey, empty = 'No data' }: TableProp
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={rowKey(row)}
-              className="border-b border-border/70 transition-colors last:border-0 hover:bg-surface/50"
-            >
-              {columns.map((col) => (
-                <td key={col.key} className={`px-4 py-3 ${col.className ?? ''}`}>
-                  {col.render(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const key = rowKey(row)
+            const expanded = expandedKey === key
+            return (
+              <Fragment key={key}>
+                <tr
+                  className={`border-b border-border/70 transition-colors last:border-0 hover:bg-surface/50 ${
+                    onRowClick ? 'cursor-pointer' : ''
+                  } ${expanded ? 'bg-surface/40' : ''}`}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
+                  {columns.map((col) => (
+                    <td key={col.key} className={`px-4 py-3 ${col.className ?? ''}`}>
+                      {col.render(row)}
+                    </td>
+                  ))}
+                </tr>
+                {expanded && renderExpanded ? (
+                  <tr className="border-b border-border/70 bg-void/80">
+                    <td colSpan={columns.length} className="px-4 py-3">
+                      {renderExpanded(row)}
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            )
+          })}
         </tbody>
       </table>
     </div>

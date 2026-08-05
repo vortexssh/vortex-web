@@ -157,6 +157,8 @@ export interface BillingHostBrief {
   billing_currency: string | null
   amount_converted: string | null
   country_code: string | null
+  is_next: boolean
+  cycle: string | null
 }
 
 export interface BillingDay {

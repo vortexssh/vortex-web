@@ -547,6 +547,8 @@ export const handlers = [
             billing_currency: h.billing_currency,
             amount_converted: h.billing_amount,
             country_code: h.country_code,
+            is_next: true,
+            cycle: h.billing_cycle,
           },
         ],
       }))

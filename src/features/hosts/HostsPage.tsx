@@ -56,6 +56,7 @@ export function HostsPage() {
   const [proxyFilter, setProxyFilter] = useState<'all' | 'on' | 'off'>('all')
   const [editor, setEditor] = useState<Host | 'new' | null>(null)
   const [enroll, setEnroll] = useState<EnrollState | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let rows = hostsQuery.data ?? []
@@ -207,17 +208,28 @@ export function HostsPage() {
         rows={filtered}
         rowKey={(h) => h.id}
         empty="No hosts match filters"
+        expandedKey={expandedId}
+        renderExpanded={(h) => <HostBillingExpand host={h} />}
         columns={[
           {
             key: 'name',
             header: 'Host',
             render: (h) => (
-              <div>
+              <button
+                type="button"
+                className="block w-full text-left"
+                onClick={() => setExpandedId((id) => (id === h.id ? null : h.id))}
+              >
                 <div className="flex items-center gap-1.5 font-medium text-fg-strong">
                   <span className="text-base leading-none" title={h.country_code ?? undefined}>
                     {countryFlag(h.country_code)}
                   </span>
                   <span>{h.name}</span>
+                  {expandedId === h.id ? (
+                    <span className="font-mono text-[10px] text-neon">▾</span>
+                  ) : (
+                    <span className="font-mono text-[10px] text-muted">▸</span>
+                  )}
                 </div>
                 <div className="font-mono text-[11px] text-muted">
                   {h.username}@{h.ip_address ?? 'NAT'}:{h.port}
@@ -227,8 +239,28 @@ export function HostsPage() {
                     {h.notes}
                   </div>
                 ) : null}
-              </div>
+              </button>
             ),
+          },
+          {
+            key: 'billing',
+            header: 'Billing',
+            render: (h) =>
+              h.billing_enabled && h.billing_renewal_at ? (
+                <button
+                  type="button"
+                  className="block text-left font-mono text-[11px]"
+                  onClick={() => setExpandedId((id) => (id === h.id ? null : h.id))}
+                >
+                  <div className="text-neon">
+                    {h.billing_amount ?? '—'} {h.billing_currency ?? ''}
+                    <span className="text-muted"> / {h.billing_cycle ?? '?'}</span>
+                  </div>
+                  <div className="text-muted">due {h.billing_renewal_at}</div>
+                </button>
+              ) : (
+                <span className="font-mono text-[11px] text-muted">—</span>
+              ),
           },
           {
             key: 'agent',
@@ -409,6 +441,57 @@ export function HostsPage() {
           </div>
         ) : null}
       </Modal>
+    </div>
+  )
+}
+
+function HostBillingExpand({ host }: { host: Host }) {
+  if (!host.billing_enabled) {
+    return (
+      <p className="font-mono text-xs text-muted">
+        Billing not tracked — enable in Edit host.
+      </p>
+    )
+  }
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Cycle</div>
+        <div className="text-sm text-fg-strong">
+          {host.billing_cycle}
+          {host.billing_cycle === 'custom' && host.billing_custom_days
+            ? ` (${host.billing_custom_days}d)`
+            : ''}
+        </div>
+      </div>
+      <div>
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+          Next renewal
+        </div>
+        <div className="text-sm text-neon">{host.billing_renewal_at ?? '—'}</div>
+      </div>
+      <div>
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Amount</div>
+        <div className="font-mono text-sm text-fg-strong">
+          {host.billing_amount ?? '—'} {host.billing_currency ?? ''}
+        </div>
+      </div>
+      <div>
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+          Auto-renew
+        </div>
+        <div className="text-sm text-fg-strong">
+          {host.billing_auto_renew ? 'on (agent online)' : 'off'}
+        </div>
+      </div>
+      {host.billing_notes?.trim() ? (
+        <div className="sm:col-span-2 lg:col-span-4">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+            Billing notes
+          </div>
+          <div className="text-sm text-dim">{host.billing_notes}</div>
+        </div>
+      ) : null}
     </div>
   )
 }

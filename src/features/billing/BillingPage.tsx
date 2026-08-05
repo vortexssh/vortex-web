@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { billingApi } from '@/services/billingApi'
+import type { BillingHostBrief } from '@/types'
 import { countryFlag } from '@/lib/countryFlag'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -18,9 +19,13 @@ function daysInMonth(year: number, month: number) {
 }
 
 function startWeekday(year: number, month: number) {
-  // Monday=0 … Sunday=6
   const d = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
   return (d + 6) % 7
+}
+
+function todayIso() {
+  const n = new Date()
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
 }
 
 export function BillingPage() {
@@ -28,6 +33,7 @@ export function BillingPage() {
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const today = todayIso()
 
   const from = `${year}-${String(month).padStart(2, '0')}-01`
   const to = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth(year, month)).padStart(2, '0')}`
@@ -42,7 +48,7 @@ export function BillingPage() {
   })
 
   const byDate = useMemo(() => {
-    const map = new Map<string, typeof calendarQuery.data extends undefined ? never : NonNullable<typeof calendarQuery.data>['days'][0]['hosts']>()
+    const map = new Map<string, BillingHostBrief[]>()
     for (const day of calendarQuery.data?.days ?? []) {
       map.set(day.date, day.hosts)
     }
@@ -73,7 +79,7 @@ export function BillingPage() {
     cells.push({ day: d, date })
   }
 
-  const selectedHosts = selectedDay ? byDate.get(selectedDay) ?? [] : []
+  const selectedHosts = selectedDay ? (byDate.get(selectedDay) ?? []) : []
   const currency = summaryQuery.data?.currency ?? calendarQuery.data?.currency ?? 'USD'
 
   return (
@@ -86,7 +92,7 @@ export function BillingPage() {
             <span className="font-mono text-base text-neon">{currency}</span>
           </p>
           <p className="mt-1 font-mono text-xs text-muted">
-            Renewals in {monthLabel(year, month)} · converted via Frankfurter
+            Next renewals in {monthLabel(year, month)} · projected periods shown dimmed
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -121,25 +127,47 @@ export function BillingPage() {
             return <div key={`pad-${idx}`} className="min-h-16 rounded-md bg-transparent" />
           }
           const hosts = byDate.get(cell.date) ?? []
-          const active = selectedDay === cell.date
+          const hasNext = hosts.some((h) => h.is_next)
+          const hasProjectedOnly = hosts.length > 0 && !hasNext
+          const selected = selectedDay === cell.date
+          const isToday = cell.date === today
           return (
             <button
               key={cell.date}
               type="button"
               onClick={() => setSelectedDay(cell.date)}
-              className={`min-h-16 rounded-md border p-1.5 text-left transition-colors ${
-                active
+              className={`relative min-h-16 rounded-md border p-1.5 text-left transition-colors ${
+                selected
                   ? 'border-neon/50 bg-neon/10'
-                  : hosts.length
+                  : hasNext
                     ? 'border-border-active bg-panel hover:border-neon/40'
-                    : 'border-border bg-surface hover:border-border-active'
-              }`}
+                    : hasProjectedOnly
+                      ? 'border-border/60 bg-surface/40 hover:border-border'
+                      : 'border-border bg-surface hover:border-border-active'
+              } ${isToday ? 'ring-1 ring-neon/60' : ''}`}
             >
-              <div className="font-mono text-xs text-dim">{cell.day}</div>
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`font-mono text-xs ${
+                    isToday ? 'font-semibold text-neon' : 'text-dim'
+                  }`}
+                >
+                  {cell.day}
+                </span>
+                {isToday ? (
+                  <span className="font-mono text-[8px] uppercase tracking-wider text-neon">
+                    today
+                  </span>
+                ) : null}
+              </div>
               {hosts.length ? (
                 <div className="mt-1 flex flex-wrap gap-0.5">
                   {hosts.slice(0, 3).map((h) => (
-                    <span key={h.id} title={h.name} className="text-sm leading-none">
+                    <span
+                      key={`${h.id}-${h.is_next ? 'n' : 'p'}`}
+                      title={`${h.name}${h.is_next ? '' : ' (projected)'}`}
+                      className={`text-sm leading-none ${h.is_next ? '' : 'opacity-35 grayscale'}`}
+                    >
                       {countryFlag(h.country_code)}
                     </span>
                   ))}
@@ -153,9 +181,17 @@ export function BillingPage() {
         })}
       </div>
 
+      <p className="font-mono text-[10px] text-muted">
+        Bright flags = next renewal · dimmed = projected future period
+      </p>
+
       <section className="rounded-lg border border-border bg-panel p-4">
         <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
-          {selectedDay ? `Due ${selectedDay}` : 'Select a day'}
+          {selectedDay
+            ? selectedDay === today
+              ? `Today · ${selectedDay}`
+              : `Due ${selectedDay}`
+            : 'Select a day'}
         </h3>
         {!selectedDay ? (
           <p className="text-sm text-dim">Click a marked day to see renewing hosts.</p>
@@ -165,18 +201,32 @@ export function BillingPage() {
           <ul className="flex flex-col gap-2">
             {selectedHosts.map((h) => (
               <li
-                key={h.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-border bg-void px-3 py-2"
+                key={`${h.id}-${h.is_next ? 'next' : 'proj'}`}
+                className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 ${
+                  h.is_next
+                    ? 'border-border bg-void'
+                    : 'border-border/50 bg-void/40 opacity-60'
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-base">{countryFlag(h.country_code)}</span>
-                  <span className="text-sm text-fg-strong">{h.name}</span>
+                  <span className={`text-base ${h.is_next ? '' : 'grayscale'}`}>
+                    {countryFlag(h.country_code)}
+                  </span>
+                  <div>
+                    <span className="text-sm text-fg-strong">{h.name}</span>
+                    {!h.is_next ? (
+                      <span className="ml-2 font-mono text-[10px] uppercase text-muted">
+                        projected
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <Badge tone="neon">
+                <Badge tone={h.is_next ? 'neon' : 'muted'}>
                   {h.billing_amount} {h.billing_currency}
                   {h.amount_converted != null
                     ? ` · ${h.amount_converted} ${currency}`
                     : ''}
+                  {h.cycle ? ` / ${h.cycle}` : ''}
                 </Badge>
               </li>
             ))}
@@ -187,7 +237,7 @@ export function BillingPage() {
       {summaryQuery.data && summaryQuery.data.items.length > 0 ? (
         <section className="rounded-lg border border-border bg-panel p-4">
           <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
-            Period items
+            Next renewals this month
           </h3>
           <ul className="flex flex-col gap-1">
             {summaryQuery.data.items.map((item) => (
