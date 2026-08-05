@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import { db } from './db'
+import { mockCountryFromIp } from './geoip'
 import type { CreateHostPayload, CreateTaskPayload, UpdateHostPayload, UpdateTaskPayload } from '@/types'
 
 /** Lightweight offline stubs — prefer live Vortex Core (`VITE_USE_MSW=false`). */
@@ -193,14 +194,15 @@ export const handlers = [
   http.post('/api/v1/hosts', async ({ request }) => {
     if (!authUser(request)) return unauthorized()
     const body = (await request.json()) as CreateHostPayload
+    const ip = body.ip_address ?? null
     const host = {
       id: db.uid('hst'),
       name: body.name,
-      ip_address: body.ip_address ?? null,
+      ip_address: ip,
       port: body.port,
       username: body.username,
       notes: body.notes ?? null,
-      country_code: body.country_code ?? null,
+      country_code: mockCountryFromIp(ip),
       is_hidden: body.is_hidden ?? false,
       sort_order: db.hosts.length,
       is_proxy_enabled: body.is_proxy_enabled ?? false,
@@ -218,13 +220,14 @@ export const handlers = [
     const host = db.findHost(String(params.id))
     if (!host) return bad('Host not found', 'host_not_found', 404)
     const body = (await request.json()) as UpdateHostPayload
+    const ip = body.ip_address === undefined ? host.ip_address : body.ip_address
     Object.assign(host, {
       name: body.name ?? host.name,
-      ip_address: body.ip_address === undefined ? host.ip_address : body.ip_address,
+      ip_address: ip,
       port: body.port ?? host.port,
       username: body.username ?? host.username,
       notes: body.notes === undefined ? host.notes : body.notes,
-      country_code: body.country_code === undefined ? host.country_code : body.country_code,
+      country_code: mockCountryFromIp(ip),
       is_hidden: body.is_hidden === undefined ? host.is_hidden : body.is_hidden,
       updated_at: new Date().toISOString(),
     })
