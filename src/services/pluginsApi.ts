@@ -67,4 +67,25 @@ export const pluginsApi = {
       },
     )
   },
+
+  dailyMetrics(
+    installId: string,
+    opts: { from: string; to: string; metric?: string; hostId?: string },
+  ) {
+    const q = new URLSearchParams()
+    q.set('from', opts.from)
+    q.set('to', opts.to)
+    q.set('metric', opts.metric ?? 'energy_kwh')
+    if (opts.hostId) q.set('host_id', opts.hostId)
+    return apiRequest<{
+      samples: Array<{
+        install_id: string
+        host_id: string | null
+        metric: string
+        day: string
+        value: number
+        meta: Record<string, unknown>
+      }>
+    }>(`/plugins/${installId}/metrics/daily?${q}`)
+  },
 }

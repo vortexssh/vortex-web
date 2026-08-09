@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { pluginsApi } from '@/services/pluginsApi'
 import { DeclarativeView } from './DeclarativeView'
+import { EnergyCalendar } from './EnergyCalendar'
 import { usePluginUiBundle } from './usePluginUiBundle'
 import { pluginRouteToPath } from './bindings'
 import type { DeclarativeNode } from './types'
@@ -43,6 +44,10 @@ export function PluginPage() {
   }
 
   const view = (routeContrib.view ?? { type: 'text', text: 'Empty view' }) as DeclarativeNode
+  const bindings = install.host_bindings ?? []
+  const [calendarHostId, setCalendarHostId] = useState(bindings[0]?.host_id ?? '')
+  const showEnergy =
+    install.plugin_id === 'com.vortex.ha_power' && bindings.length > 0
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -64,6 +69,27 @@ export function PluginPage() {
           void qc.invalidateQueries({ queryKey: ['plugins', 'state', install.id] })
         }}
       />
+      {showEnergy ? (
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Calendar host
+            <select
+              className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong"
+              value={calendarHostId}
+              onChange={(e) => setCalendarHostId(e.target.value)}
+            >
+              {bindings.map((b) => (
+                <option key={b.host_id} value={b.host_id}>
+                  {b.host_id.slice(0, 8)}… · {String((b.config as { entity_id?: string }).entity_id ?? '—')}
+                </option>
+              ))}
+            </select>
+          </label>
+          {calendarHostId ? (
+            <EnergyCalendar installId={install.id} hostId={calendarHostId} />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

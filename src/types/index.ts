@@ -224,12 +224,37 @@ export interface PublicTelemetry {
   collected_at: string | null
 }
 
+export interface PublicBilling {
+  enabled: boolean
+  cycle: string | null
+  custom_days: number | null
+  renewal_at: string | null
+  amount: number | null
+  currency: string | null
+  auto_renew: boolean
+}
+
+export interface PublicEnergyDay {
+  day: string
+  value: number
+}
+
+export interface PublicEnergy {
+  metric: string
+  unit: string
+  today_kwh: number | null
+  month_kwh: number | null
+  calendar: PublicEnergyDay[]
+}
+
 export interface PublicHost {
   id: string
   name: string
   country_code: string | null
   agent_online: boolean
   telemetry: PublicTelemetry | null
+  billing: PublicBilling | null
+  energy: PublicEnergy | null
 }
 
 export interface PublicStatusPage {

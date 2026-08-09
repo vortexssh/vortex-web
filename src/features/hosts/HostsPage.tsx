@@ -17,7 +17,9 @@ import { toast, toastCopy } from '@/components/ui/Toast'
 import { buildAgentInstallBundle } from '@/features/hosts/agentInstall'
 import { countryFlag } from '@/lib/countryFlag'
 import { HostPluginMetricCell, HostPluginPanels } from '@/plugins/HostPluginPanels'
-import { useSlotContributions } from '@/plugins/usePluginUiBundle'
+import { findHaPowerInstallId } from '@/plugins/EnergyCalendar'
+import { usePluginUiBundle, useSlotContributions } from '@/plugins/usePluginUiBundle'
+import { pluginsApi } from '@/services/pluginsApi'
 
 type EnrollState = {
   host: Host
@@ -562,6 +564,17 @@ function HostEditorModal({
     host?.billing_auto_renew ?? true,
   )
   const [billingNotes, setBillingNotes] = useState(host?.billing_notes ?? '')
+  const pluginBundle = usePluginUiBundle()
+  const haInstallId = findHaPowerInstallId(pluginBundle.data?.installs)
+  const haInstall = pluginBundle.data?.installs.find((i) => i.id === haInstallId)
+  const existingEntity =
+    host && haInstall
+      ? String(
+          haInstall.host_bindings.find((b) => b.host_id === host.id)?.config?.entity_id ??
+            '',
+        )
+      : ''
+  const [haEntityId, setHaEntityId] = useState(existingEntity)
 
   const advanceMutation = useMutation({
     mutationFn: () => {
@@ -623,12 +636,21 @@ function HostEditorModal({
           saved = await hostsApi.setTags(saved.id, tagIds)
         }
       }
+      if (haInstallId) {
+        const entity = haEntityId.trim()
+        if (entity) {
+          await pluginsApi.setBinding(haInstallId, saved.id, { entity_id: entity })
+        } else if (host) {
+          await pluginsApi.deleteBinding(haInstallId, saved.id).catch(() => undefined)
+        }
+      }
       return saved
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })
       void qc.invalidateQueries({ queryKey: ['tags'] })
       void qc.invalidateQueries({ queryKey: ['billing'] })
+      void qc.invalidateQueries({ queryKey: ['plugins'] })
       toast(host ? 'Host updated' : 'Host created', 'success')
       onClose()
     },
@@ -790,6 +812,20 @@ function HostEditorModal({
             </div>
           ) : null}
         </div>
+
+        {haInstallId ? (
+          <div className="rounded-md border border-border bg-panel/50 p-3">
+            <Input
+              label="HA power entity (com.vortex.ha_power)"
+              value={haEntityId}
+              onChange={(e) => setHaEntityId(e.target.value)}
+              placeholder="sensor.plug_energy or sensor.xxx_power"
+            />
+            <p className="mt-1 font-mono text-[10px] text-muted">
+              One Home Assistant entity per host. Leave empty to unbind.
+            </p>
+          </div>
+        ) : null}
 
         <div>
           <div className="mb-1 text-xs uppercase tracking-wider text-muted">Tags</div>

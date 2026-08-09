@@ -2,14 +2,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { pluginsApi } from '@/services/pluginsApi'
 import type { Host } from '@/types'
 import { DeclarativeView } from './DeclarativeView'
-import { useSlotContributions } from './usePluginUiBundle'
+import { EnergyCalendar, findHaPowerInstallId } from './EnergyCalendar'
+import { usePluginUiBundle, useSlotContributions } from './usePluginUiBundle'
 import type { DeclarativeNode } from './types'
 
 export function HostPluginPanels({ host }: { host: Host }) {
   const contribs = useSlotContributions('hosts.detail.panels')
+  const bundle = usePluginUiBundle()
   const qc = useQueryClient()
+  const haInstallId = findHaPowerInstallId(bundle.data?.installs)
 
-  if (contribs.length === 0) return null
+  if (contribs.length === 0 && !haInstallId) return null
 
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-3">
@@ -30,6 +33,9 @@ export function HostPluginPanels({ host }: { host: Host }) {
           }}
         />
       ))}
+      {haInstallId ? (
+        <EnergyCalendar installId={haInstallId} hostId={host.id} />
+      ) : null}
     </div>
   )
 }
