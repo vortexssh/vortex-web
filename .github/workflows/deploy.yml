@@ -19,7 +19,9 @@ jobs:
           script: |
             set -e
             cd /opt/vortex-web
-            git pull origin master
+            # Discard local hotfixes so CI pull never blocks (deploy is source-of-truth = origin/master)
+            git fetch origin master
+            git reset --hard origin/master
             # Free space before BuildKit (small VPS); ignore prune errors
             docker builder prune -f || true
             docker image prune -f || true
