@@ -117,11 +117,11 @@ export function PluginsManager() {
 
   const installMutation = useMutation({
     mutationFn: async (source: PendingInstall) => {
-      const config = { interval_seconds: 10 }
       if (source.kind === 'zip') {
-        return pluginsApi.installPackage(source.file, config)
+        // Empty config — plugin schemas differ (HA uses poll_interval_seconds, etc.)
+        return pluginsApi.installPackage(source.file, {})
       }
-      return pluginsApi.install(source.manifest, config)
+      return pluginsApi.install(source.manifest, { interval_seconds: 10 })
     },
     onSuccess: (created) => {
       setLastToken(created.daemon_token)
