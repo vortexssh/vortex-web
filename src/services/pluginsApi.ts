@@ -1,4 +1,4 @@
-import { apiRequest, ApiError } from './apiClient'
+import { apiRequest } from './apiClient'
 import type { PluginInstall, PluginState, PluginUiBundle } from '@/plugins/types'
 import { materializeManifestFromZip } from '@/plugins/materializePluginZip'
 
@@ -26,23 +26,12 @@ export const pluginsApi = {
 
   /**
    * ZIP with vortex-plugin.json (+ optional ui/, schemas/).
-   * Prefers Core multipart endpoint; on 404 unpacks in-browser and POSTs JSON
-   * (works when Web is newer than Core).
+   * Unpacks in-browser and installs via POST /plugins — does not require
+   * Core /install-package (prod may not have that route yet).
    */
   async installPackage(file: File, config: Record<string, unknown> = {}) {
-    const body = new FormData()
-    body.append('file', file)
-    body.append('config', JSON.stringify(config))
-    try {
-      return await apiRequest<PluginInstallCreated>('/plugins/install-package', {
-        method: 'POST',
-        body,
-      })
-    } catch (err) {
-      if (!(err instanceof ApiError) || err.status !== 404) throw err
-      const manifest = await materializeManifestFromZip(file)
-      return this.install(manifest, config)
-    }
+    const manifest = await materializeManifestFromZip(file)
+    return this.install(manifest, config)
   },
 
   update(
