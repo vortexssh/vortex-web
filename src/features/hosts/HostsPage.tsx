@@ -16,6 +16,8 @@ import { Toggle } from '@/components/ui/Toggle'
 import { toast, toastCopy } from '@/components/ui/Toast'
 import { buildAgentInstallBundle } from '@/features/hosts/agentInstall'
 import { countryFlag } from '@/lib/countryFlag'
+import { HostPluginMetricCell, HostPluginPanels } from '@/plugins/HostPluginPanels'
+import { useSlotContributions } from '@/plugins/usePluginUiBundle'
 
 type EnrollState = {
   host: Host
@@ -57,6 +59,7 @@ export function HostsPage() {
   const [editor, setEditor] = useState<Host | 'new' | null>(null)
   const [enroll, setEnroll] = useState<EnrollState | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const pluginColumns = useSlotContributions('hosts.table.columns')
 
   const filtered = useMemo(() => {
     let rows = hostsQuery.data ?? []
@@ -209,7 +212,12 @@ export function HostsPage() {
         rowKey={(h) => h.id}
         empty="No hosts match filters"
         expandedKey={expandedId}
-        renderExpanded={(h) => <HostBillingExpand host={h} />}
+        renderExpanded={(h) => (
+          <div>
+            <HostBillingExpand host={h} />
+            <HostPluginPanels host={h} />
+          </div>
+        )}
         columns={[
           {
             key: 'name',
@@ -314,6 +322,25 @@ export function HostsPage() {
               </div>
             ),
           },
+          ...pluginColumns.map((c) => {
+            const col = (c.payload.column ?? {}) as {
+              header?: string
+              bind?: string
+              unit?: string
+            }
+            return {
+              key: `plugin:${c.install_id}:${c.contribution_id}`,
+              header: col.header ?? c.plugin_name,
+              render: (h: Host) => (
+                <HostPluginMetricCell
+                  host={h}
+                  installId={c.install_id}
+                  bind={col.bind ?? 'plugin.state.value'}
+                  unit={col.unit}
+                />
+              ),
+            }
+          }),
           {
             key: 'actions',
             header: '',

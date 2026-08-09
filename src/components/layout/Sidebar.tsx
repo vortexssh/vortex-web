@@ -10,8 +10,11 @@ import {
   X,
   Lock,
   Wallet,
+  Puzzle,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { useSlotContributions } from '@/plugins/usePluginUiBundle'
+import { pluginRouteToPath } from '@/plugins/bindings'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, needs2fa: true },
@@ -30,6 +33,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const is2faEnabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
+  const pluginNav = useSlotContributions('nav.items')
 
   return (
     <>
@@ -84,6 +88,31 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                 <Icon className="h-4 w-4 shrink-0 opacity-80" />
                 <span className="flex-1">{label}</span>
                 {locked ? <Lock className="h-3 w-3 shrink-0 text-warn opacity-80" /> : null}
+              </NavLink>
+            )
+          })}
+          {pluginNav.map((c) => {
+            const item = (c.payload.item ?? {}) as { label?: string; route?: string }
+            const to = pluginRouteToPath(
+              item.route ?? `plugin:${c.plugin_id}/home`,
+              c.plugin_id,
+            )
+            return (
+              <NavLink
+                key={`${c.install_id}:${c.contribution_id}`}
+                to={to}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  [
+                    'group flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors',
+                    isActive
+                      ? 'border-neon/40 bg-neon/10 text-neon border-glow'
+                      : 'border-transparent text-dim hover:border-border-active hover:bg-panel hover:text-neon/80',
+                  ].join(' ')
+                }
+              >
+                <Puzzle className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="flex-1">{item.label ?? c.plugin_name}</span>
               </NavLink>
             )
           })}

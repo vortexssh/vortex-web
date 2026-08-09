@@ -38,6 +38,12 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
 
 function resolveMeta(pathname: string) {
   if (pathname.startsWith('/terminal/')) return PAGE_META['/terminal']!
+  if (pathname.startsWith('/plugins/')) {
+    return {
+      title: 'Plugin',
+      subtitle: 'Declarative extension · daemon-backed',
+    }
+  }
   return (
     PAGE_META[pathname] ?? {
       title: 'Vortex Web',

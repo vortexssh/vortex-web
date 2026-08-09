@@ -30,6 +30,9 @@ const BillingPage = lazy(() =>
 const PublicStatusPage = lazy(() =>
   import('@/features/status/PublicStatusPage').then((m) => ({ default: m.PublicStatusPage })),
 )
+const PluginPage = lazy(() =>
+  import('@/plugins/PluginPage').then((m) => ({ default: m.PluginPage })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -146,6 +149,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageFallback />}>
                     <SettingsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="plugins/:pluginId/*"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PluginPage />
                   </Suspense>
                 }
               />

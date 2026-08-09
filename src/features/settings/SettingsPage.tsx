@@ -15,6 +15,11 @@ import { Table } from '@/components/ui/Table'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/Toast'
 import type { NotificationSettings, TelegramLinkResponse } from '@/types'
+import { PluginsManager } from '@/plugins/PluginsManager'
+import { DeclarativeView } from '@/plugins/DeclarativeView'
+import { usePluginUiBundle, useSlotContributions } from '@/plugins/usePluginUiBundle'
+import { pluginsApi } from '@/services/pluginsApi'
+import type { DeclarativeNode } from '@/plugins/types'
 
 type SettingsTab =
   | 'profile'
@@ -23,6 +28,8 @@ type SettingsTab =
   | 'security'
   | 'appearance'
   | 'api-keys'
+  | 'plugins'
+  | `plugin:${string}`
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'profile', label: 'Profile' },
@@ -31,15 +38,26 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'security', label: 'Security' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'api-keys', label: 'API keys' },
+  { id: 'plugins', label: 'Plugins' },
 ]
 
 export function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('profile')
+  const pluginTabs = useSlotContributions('settings.tabs')
+  const bundle = usePluginUiBundle()
+
+  const tabs = [
+    ...TABS,
+    ...pluginTabs.map((c) => ({
+      id: `plugin:${c.install_id}:${c.contribution_id}` as SettingsTab,
+      label: c.payload.label ? String(c.payload.label) : c.plugin_name,
+    })),
+  ]
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 lg:flex-row">
       <nav className="flex shrink-0 flex-row gap-1 overflow-x-auto lg:w-44 lg:flex-col">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -62,8 +80,55 @@ export function SettingsPage() {
         {tab === 'security' ? <SecuritySection /> : null}
         {tab === 'appearance' ? <AppearanceSection /> : null}
         {tab === 'api-keys' ? <ApiKeysSection /> : null}
+        {tab === 'plugins' ? <PluginsManager /> : null}
+        {typeof tab === 'string' && tab.startsWith('plugin:')
+          ? (() => {
+              const contrib = pluginTabs.find(
+                (c) => `plugin:${c.install_id}:${c.contribution_id}` === tab,
+              )
+              if (!contrib) return null
+              const install = bundle.data?.installs.find((i) => i.id === contrib.install_id)
+              return (
+                <PluginSettingsTab
+                  installId={contrib.install_id}
+                  view={contrib.view as DeclarativeNode}
+                  install={install}
+                />
+              )
+            })()
+          : null}
       </div>
     </div>
+  )
+}
+
+function PluginSettingsTab({
+  installId,
+  view,
+  install,
+}: {
+  installId: string
+  view: DeclarativeNode | null
+  install?: { id: string; config: Record<string, unknown>; name: string }
+}) {
+  const qc = useQueryClient()
+  const stateQuery = useQuery({
+    queryKey: ['plugins', 'state', installId],
+    queryFn: () => pluginsApi.state(installId),
+    refetchInterval: 10_000,
+  })
+  return (
+    <DeclarativeView
+      node={view ?? { type: 'text', text: 'Empty settings view' }}
+      installId={installId}
+      ctx={{
+        install: install as never,
+        pluginState: stateQuery.data?.state ?? {},
+      }}
+      onStateChange={() => {
+        void qc.invalidateQueries({ queryKey: ['plugins', 'state', installId] })
+      }}
+    />
   )
 }
 
