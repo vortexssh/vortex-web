@@ -1,6 +1,7 @@
-# syntax=docker/dockerfile:1
 # Vortex Web — SPA only. Agent binaries are NOT part of this image.
 # Enroll downloads the agent from VITE_AGENT_BINARY_BASE_URL (CDN / GitHub Release / etc.).
+# Note: no "# syntax=docker/dockerfile:1" — avoids an extra BuildKit frontend pull that
+# often fails on small VPS disks / flaky registry (grpc server closed unexpectedly).
 
 FROM node:22-alpine AS build
 WORKDIR /app

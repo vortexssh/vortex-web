@@ -17,6 +17,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            set -e
             cd /opt/vortex-web
             git pull origin master
+            # Free space before BuildKit (small VPS); ignore prune errors
+            docker builder prune -f || true
+            docker image prune -f || true
             docker compose up -d --build
