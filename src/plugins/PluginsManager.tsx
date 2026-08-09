@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { pluginsApi } from '@/services/pluginsApi'
 import { ApiError } from '@/services/apiClient'
@@ -104,18 +104,26 @@ const SAMPLE_MANIFEST = {
   },
 }
 
+async function readManifestFile(file: File): Promise<Record<string, unknown>> {
+  const text = await file.text()
+  const parsed: unknown = JSON.parse(text)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Manifest must be a JSON object')
+  }
+  return parsed as Record<string, unknown>
+}
+
 export function PluginsManager() {
   const qc = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const listQuery = useQuery({ queryKey: ['plugins'], queryFn: () => pluginsApi.list() })
-  const [manifestJson, setManifestJson] = useState(
-    JSON.stringify(SAMPLE_MANIFEST, null, 2),
-  )
+  const [manifest, setManifest] = useState<Record<string, unknown> | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
   const [lastToken, setLastToken] = useState<string | null>(null)
 
   const installMutation = useMutation({
-    mutationFn: async () => {
-      const manifest = JSON.parse(manifestJson) as Record<string, unknown>
-      return pluginsApi.install(manifest, { interval_seconds: 10 })
+    mutationFn: async (payload: Record<string, unknown>) => {
+      return pluginsApi.install(payload, { interval_seconds: 10 })
     },
     onSuccess: (created) => {
       setLastToken(created.daemon_token)
@@ -136,9 +144,39 @@ export function PluginsManager() {
       toast(err instanceof ApiError ? err.message : 'Remove failed', 'error'),
   })
 
+  async function onFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setManifest(null)
+      setFileName(null)
+      return
+    }
+    try {
+      const parsed = await readManifestFile(file)
+      setManifest(parsed)
+      setFileName(file.name)
+      toast(`Loaded ${file.name}`, 'success')
+    } catch (err) {
+      setManifest(null)
+      setFileName(null)
+      toast(err instanceof Error ? err.message : 'Invalid JSON file', 'error')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function loadSample() {
+    setManifest(SAMPLE_MANIFEST as Record<string, unknown>)
+    setFileName('fake-metrics.sample.json')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   function onInstall(e: FormEvent) {
     e.preventDefault()
-    installMutation.mutate()
+    if (!manifest) {
+      toast('Choose a vortex-plugin.json file first', 'error')
+      return
+    }
+    installMutation.mutate(manifest)
   }
 
   return (
@@ -181,18 +219,41 @@ export function PluginsManager() {
       <section className="rounded-lg border border-border bg-panel p-4">
         <h3 className="mb-2 text-sm font-medium text-fg-strong">Install from manifest</h3>
         <p className="mb-3 text-xs text-muted">
-          Paste a <code className="text-neon">vortex-plugin.json</code> (inline views/schemas
-          supported). A daemon token is shown once after install.
+          Select a <code className="text-neon">vortex-plugin.json</code> file (inline
+          views/schemas supported). A daemon token is shown once after install.
         </p>
         <form className="flex flex-col gap-3" onSubmit={onInstall}>
-          <textarea
-            className="min-h-48 w-full rounded-md border border-border bg-void p-3 font-mono text-[11px] text-dim"
-            value={manifestJson}
-            onChange={(e) => setManifestJson(e.target.value)}
-            spellCheck={false}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={(e) => void onFileChange(e)}
+              className="block w-full max-w-md text-xs text-muted file:mr-3 file:rounded-md file:border file:border-border file:bg-void file:px-3 file:py-1.5 file:text-xs file:text-fg-strong hover:file:border-neon/40"
+            />
+            <Button type="button" onClick={loadSample}>
+              Load sample
+            </Button>
+          </div>
+          {fileName ? (
+            <p className="font-mono text-[11px] text-dim">
+              Ready: <span className="text-neon">{fileName}</span>
+              {typeof manifest?.id === 'string' ? (
+                <>
+                  {' '}
+                  · <span className="text-fg-strong">{manifest.id}</span>
+                  {typeof manifest.version === 'string' ? ` v${manifest.version}` : null}
+                </>
+              ) : null}
+            </p>
+          ) : (
+            <p className="text-xs text-muted">No file selected.</p>
+          )}
           <div>
-            <Button type="submit" disabled={installMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={installMutation.isPending || !manifest}
+            >
               {installMutation.isPending ? 'Installing…' : 'Install plugin'}
             </Button>
           </div>
