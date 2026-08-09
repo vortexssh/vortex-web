@@ -104,26 +104,24 @@ const SAMPLE_MANIFEST = {
   },
 }
 
-async function readManifestFile(file: File): Promise<Record<string, unknown>> {
-  const text = await file.text()
-  const parsed: unknown = JSON.parse(text)
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Manifest must be a JSON object')
-  }
-  return parsed as Record<string, unknown>
-}
+type PendingInstall =
+  | { kind: 'zip'; file: File }
+  | { kind: 'manifest'; manifest: Record<string, unknown>; label: string }
 
 export function PluginsManager() {
   const qc = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const listQuery = useQuery({ queryKey: ['plugins'], queryFn: () => pluginsApi.list() })
-  const [manifest, setManifest] = useState<Record<string, unknown> | null>(null)
-  const [fileName, setFileName] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingInstall | null>(null)
   const [lastToken, setLastToken] = useState<string | null>(null)
 
   const installMutation = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => {
-      return pluginsApi.install(payload, { interval_seconds: 10 })
+    mutationFn: async (source: PendingInstall) => {
+      const config = { interval_seconds: 10 }
+      if (source.kind === 'zip') {
+        return pluginsApi.installPackage(source.file, config)
+      }
+      return pluginsApi.install(source.manifest, config)
     },
     onSuccess: (created) => {
       setLastToken(created.daemon_token)
@@ -144,40 +142,46 @@ export function PluginsManager() {
       toast(err instanceof ApiError ? err.message : 'Remove failed', 'error'),
   })
 
-  async function onFileChange(e: ChangeEvent<HTMLInputElement>) {
+  function onFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) {
-      setManifest(null)
-      setFileName(null)
+      setPending(null)
       return
     }
-    try {
-      const parsed = await readManifestFile(file)
-      setManifest(parsed)
-      setFileName(file.name)
-      toast(`Loaded ${file.name}`, 'success')
-    } catch (err) {
-      setManifest(null)
-      setFileName(null)
-      toast(err instanceof Error ? err.message : 'Invalid JSON file', 'error')
+    const lower = file.name.toLowerCase()
+    if (!lower.endsWith('.zip')) {
+      setPending(null)
+      toast('Choose a .zip plugin package', 'error')
       if (fileInputRef.current) fileInputRef.current.value = ''
+      return
     }
+    setPending({ kind: 'zip', file })
   }
 
   function loadSample() {
-    setManifest(SAMPLE_MANIFEST as Record<string, unknown>)
-    setFileName('fake-metrics.sample.json')
+    setPending({
+      kind: 'manifest',
+      manifest: SAMPLE_MANIFEST as Record<string, unknown>,
+      label: 'fake-metrics.sample.json',
+    })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function onInstall(e: FormEvent) {
     e.preventDefault()
-    if (!manifest) {
-      toast('Choose a vortex-plugin.json file first', 'error')
+    if (!pending) {
+      toast('Choose a plugin .zip first', 'error')
       return
     }
-    installMutation.mutate(manifest)
+    installMutation.mutate(pending)
   }
+
+  const readyLabel =
+    pending?.kind === 'zip'
+      ? pending.file.name
+      : pending?.kind === 'manifest'
+        ? pending.label
+        : null
 
   return (
     <div className="flex flex-col gap-6">
@@ -217,42 +221,41 @@ export function PluginsManager() {
       </section>
 
       <section className="rounded-lg border border-border bg-panel p-4">
-        <h3 className="mb-2 text-sm font-medium text-fg-strong">Install from manifest</h3>
+        <h3 className="mb-2 text-sm font-medium text-fg-strong">Install from package</h3>
         <p className="mb-3 text-xs text-muted">
-          Select a <code className="text-neon">vortex-plugin.json</code> file (inline
-          views/schemas supported). A daemon token is shown once after install.
+          Upload a <code className="text-neon">.zip</code> with{' '}
+          <code className="text-neon">vortex-plugin.json</code> at the root (or one folder
+          deep). Optional <code className="text-neon">ui/</code> and{' '}
+          <code className="text-neon">schemas/</code> are inlined on the server. Daemon
+          sources in the archive are ignored. A daemon token is shown once after install.
         </p>
         <form className="flex flex-col gap-3" onSubmit={onInstall}>
           <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json,application/json"
-              onChange={(e) => void onFileChange(e)}
+              accept=".zip,application/zip"
+              onChange={onFileChange}
               className="block w-full max-w-md text-xs text-muted file:mr-3 file:rounded-md file:border file:border-border file:bg-void file:px-3 file:py-1.5 file:text-xs file:text-fg-strong hover:file:border-neon/40"
             />
             <Button type="button" onClick={loadSample}>
               Load sample
             </Button>
           </div>
-          {fileName ? (
+          {readyLabel ? (
             <p className="font-mono text-[11px] text-dim">
-              Ready: <span className="text-neon">{fileName}</span>
-              {typeof manifest?.id === 'string' ? (
-                <>
-                  {' '}
-                  · <span className="text-fg-strong">{manifest.id}</span>
-                  {typeof manifest.version === 'string' ? ` v${manifest.version}` : null}
-                </>
+              Ready: <span className="text-neon">{readyLabel}</span>
+              {pending?.kind === 'manifest' ? (
+                <span className="text-muted"> (inline sample, not a ZIP)</span>
               ) : null}
             </p>
           ) : (
-            <p className="text-xs text-muted">No file selected.</p>
+            <p className="text-xs text-muted">No package selected.</p>
           )}
           <div>
             <Button
               type="submit"
-              disabled={installMutation.isPending || !manifest}
+              disabled={installMutation.isPending || !pending}
             >
               {installMutation.isPending ? 'Installing…' : 'Install plugin'}
             </Button>

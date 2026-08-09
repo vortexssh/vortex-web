@@ -26,6 +26,7 @@ export function setStoredToken(token: string | null): void {
 }
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
+  /** JSON-serializable value, or FormData (multipart; Content-Type left unset). */
   body?: unknown
   auth?: boolean
 }
@@ -60,8 +61,9 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { body, auth = true, headers: initHeaders, ...rest } = options
   const headers = new Headers(initHeaders)
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
 
-  if (body !== undefined && !headers.has('Content-Type')) {
+  if (body !== undefined && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -75,7 +77,12 @@ export async function apiRequest<T>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...rest,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
   })
 
   if (response.status === 204) {

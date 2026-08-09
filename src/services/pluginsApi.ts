@@ -1,6 +1,8 @@
 import { apiRequest } from './apiClient'
 import type { PluginInstall, PluginState, PluginUiBundle } from '@/plugins/types'
 
+export type PluginInstallCreated = PluginInstall & { daemon_token: string }
+
 export const pluginsApi = {
   list(): Promise<PluginInstall[]> {
     return apiRequest<PluginInstall[]>('/plugins')
@@ -15,9 +17,20 @@ export const pluginsApi = {
   },
 
   install(manifest: Record<string, unknown>, config: Record<string, unknown> = {}) {
-    return apiRequest<PluginInstall & { daemon_token: string }>('/plugins', {
+    return apiRequest<PluginInstallCreated>('/plugins', {
       method: 'POST',
       body: { manifest, config },
+    })
+  },
+
+  /** ZIP with vortex-plugin.json (+ optional ui/, schemas/). */
+  installPackage(file: File, config: Record<string, unknown> = {}) {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('config', JSON.stringify(config))
+    return apiRequest<PluginInstallCreated>('/plugins/install-package', {
+      method: 'POST',
+      body,
     })
   },
 
