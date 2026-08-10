@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { billingApi } from '@/services/billingApi'
 import type { BillingHostBrief } from '@/types'
 import { countryFlag } from '@/lib/countryFlag'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { ApiError } from '@/services/apiClient'
+import { toast } from '@/components/ui/Toast'
 
 function monthLabel(year: number, month: number) {
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en', {
@@ -30,6 +32,7 @@ function todayIso() {
 }
 
 export function BillingPage() {
+  const qc = useQueryClient()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -54,6 +57,17 @@ export function BillingPage() {
   const summaryQuery = useQuery({
     queryKey: ['billing', 'summary', from, to, selectedPayerId],
     queryFn: () => billingApi.summary(from, to, payerFilter),
+  })
+
+  const renewMutation = useMutation({
+    mutationFn: (hostId: string) => billingApi.advance(hostId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['billing'] })
+      void qc.invalidateQueries({ queryKey: ['hosts'] })
+      toast('Marked paid · period renewed', 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Renew failed', 'error'),
   })
 
   const byDate = useMemo(() => {
@@ -295,13 +309,13 @@ export function BillingPage() {
             {selectedHosts.map((h) => (
               <li
                 key={`${h.id}-${h.is_next ? 'next' : 'proj'}`}
-                className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 ${
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2 ${
                   h.is_next
                     ? 'border-border bg-void'
                     : 'border-border/50 bg-void/40 opacity-60'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className={`text-base ${h.is_next ? '' : 'grayscale'}`}>
                     {countryFlag(h.country_code)}
                   </span>
@@ -319,13 +333,28 @@ export function BillingPage() {
                     ) : null}
                   </div>
                 </div>
-                <Badge tone={h.is_next ? 'neon' : 'muted'}>
-                  {h.billing_amount} {h.billing_currency}
-                  {h.amount_converted != null
-                    ? ` · ${h.amount_converted} ${currency}`
-                    : ''}
-                  {h.cycle ? ` / ${h.cycle}` : ''}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={h.is_next ? 'neon' : 'muted'}>
+                    {h.billing_amount} {h.billing_currency}
+                    {h.amount_converted != null
+                      ? ` · ${h.amount_converted} ${currency}`
+                      : ''}
+                    {h.cycle ? ` / ${h.cycle}` : ''}
+                  </Badge>
+                  {h.is_next ? (
+                    <Button
+                      variant="outline"
+                      className="!px-2 !text-[10px]"
+                      title="Mark paid at provider — advance next due"
+                      disabled={renewMutation.isPending}
+                      onClick={() => renewMutation.mutate(h.id)}
+                    >
+                      {renewMutation.isPending && renewMutation.variables === h.id
+                        ? '…'
+                        : 'Renew'}
+                    </Button>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -341,15 +370,26 @@ export function BillingPage() {
             {summaryQuery.data.items.map((item) => (
               <li
                 key={item.host_id}
-                className="flex justify-between gap-2 font-mono text-xs text-dim"
+                className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs text-dim"
               >
                 <span>{item.host_name}</span>
-                <span>
-                  {item.amount} {item.currency}
-                  {item.amount_converted != null
-                    ? ` → ${item.amount_converted} ${currency}`
-                    : ''}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span>
+                    {item.amount} {item.currency}
+                    {item.amount_converted != null
+                      ? ` → ${item.amount_converted} ${currency}`
+                      : ''}
+                    {item.renewal_at ? ` · due ${item.renewal_at}` : ''}
+                  </span>
+                  <Button
+                    variant="outline"
+                    className="!px-2 !text-[10px]"
+                    disabled={renewMutation.isPending}
+                    onClick={() => renewMutation.mutate(item.host_id)}
+                  >
+                    Renew
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

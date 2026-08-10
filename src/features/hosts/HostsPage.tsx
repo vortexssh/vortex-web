@@ -117,6 +117,20 @@ export function HostsPage() {
       toast(err instanceof ApiError ? err.message : 'Update failed', 'error'),
   })
 
+  const renewMutation = useMutation({
+    mutationFn: (id: string) => hostsApi.advanceBilling(id),
+    onSuccess: (host) => {
+      void qc.invalidateQueries({ queryKey: ['hosts'] })
+      void qc.invalidateQueries({ queryKey: ['billing'] })
+      toast(
+        `«${host.name}» renewed · next due ${host.billing_renewal_at ?? '—'}`,
+        'success',
+      )
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Renew failed', 'error'),
+  })
+
   const reorderMutation = useMutation({
     mutationFn: (host_ids: string[]) => hostsApi.reorder(host_ids),
     onSuccess: (hosts) => {
@@ -233,7 +247,11 @@ export function HostsPage() {
         expandedKey={expandedId}
         renderExpanded={(h) => (
           <div>
-            <HostBillingExpand host={h} />
+            <HostBillingExpand
+              host={h}
+              renewing={renewMutation.isPending && renewMutation.variables === h.id}
+              onRenew={() => renewMutation.mutate(h.id)}
+            />
             <HostPluginPanels host={h} />
           </div>
         )}
@@ -274,17 +292,28 @@ export function HostsPage() {
             header: 'Billing',
             render: (h) =>
               h.billing_enabled && h.billing_renewal_at ? (
-                <button
-                  type="button"
-                  className="block text-left font-mono text-[11px]"
-                  onClick={() => setExpandedId((id) => (id === h.id ? null : h.id))}
-                >
-                  <div className="text-neon">
-                    {h.billing_amount ?? '—'} {h.billing_currency ?? ''}
-                    <span className="text-muted"> / {h.billing_cycle ?? '?'}</span>
-                  </div>
-                  <div className="text-muted">due {h.billing_renewal_at}</div>
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="block text-left font-mono text-[11px]"
+                    onClick={() => setExpandedId((id) => (id === h.id ? null : h.id))}
+                  >
+                    <div className="text-neon">
+                      {h.billing_amount ?? '—'} {h.billing_currency ?? ''}
+                      <span className="text-muted"> / {h.billing_cycle ?? '?'}</span>
+                    </div>
+                    <div className="text-muted">due {h.billing_renewal_at}</div>
+                  </button>
+                  <Button
+                    variant="outline"
+                    className="!px-2 !text-[10px]"
+                    title="Mark paid — advance to next period"
+                    disabled={renewMutation.isPending}
+                    onClick={() => renewMutation.mutate(h.id)}
+                  >
+                    Renew
+                  </Button>
+                </div>
               ) : (
                 <span className="font-mono text-[11px] text-muted">—</span>
               ),
@@ -492,7 +521,15 @@ export function HostsPage() {
   )
 }
 
-function HostBillingExpand({ host }: { host: Host }) {
+function HostBillingExpand({
+  host,
+  onRenew,
+  renewing,
+}: {
+  host: Host
+  onRenew: () => void
+  renewing?: boolean
+}) {
   if (!host.billing_enabled) {
     return (
       <p className="font-mono text-xs text-muted">
@@ -501,50 +538,65 @@ function HostBillingExpand({ host }: { host: Host }) {
     )
   }
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {host.payer ? (
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Payer</div>
-          <div className="text-sm text-fg-strong">{host.payer.name}</div>
-        </div>
-      ) : null}
-      <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Cycle</div>
-        <div className="text-sm text-fg-strong">
-          {host.billing_cycle}
-          {host.billing_cycle === 'custom' && host.billing_custom_days
-            ? ` (${host.billing_custom_days}d)`
-            : ''}
-        </div>
-      </div>
-      <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-          Next renewal
-        </div>
-        <div className="text-sm text-neon">{host.billing_renewal_at ?? '—'}</div>
-      </div>
-      <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Amount</div>
-        <div className="font-mono text-sm text-fg-strong">
-          {host.billing_amount ?? '—'} {host.billing_currency ?? ''}
-        </div>
-      </div>
-      <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-          Auto-renew
-        </div>
-        <div className="text-sm text-fg-strong">
-          {host.billing_auto_renew ? 'on (agent online)' : 'off'}
-        </div>
-      </div>
-      {host.billing_notes?.trim() ? (
-        <div className="sm:col-span-2 lg:col-span-4">
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-            Billing notes
+    <div className="flex flex-col gap-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {host.payer ? (
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Payer</div>
+            <div className="text-sm text-fg-strong">{host.payer.name}</div>
           </div>
-          <div className="text-sm text-dim">{host.billing_notes}</div>
+        ) : null}
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Cycle</div>
+          <div className="text-sm text-fg-strong">
+            {host.billing_cycle}
+            {host.billing_cycle === 'custom' && host.billing_custom_days
+              ? ` (${host.billing_custom_days}d)`
+              : ''}
+          </div>
         </div>
-      ) : null}
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+            Next renewal
+          </div>
+          <div className="text-sm text-neon">{host.billing_renewal_at ?? '—'}</div>
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Amount</div>
+          <div className="font-mono text-sm text-fg-strong">
+            {host.billing_amount ?? '—'} {host.billing_currency ?? ''}
+          </div>
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+            Auto-renew
+          </div>
+          <div className="text-sm text-fg-strong">
+            {host.billing_auto_renew ? 'on (agent online)' : 'off'}
+          </div>
+        </div>
+        {host.billing_notes?.trim() ? (
+          <div className="sm:col-span-2 lg:col-span-4">
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              Billing notes
+            </div>
+            <div className="text-sm text-dim">{host.billing_notes}</div>
+          </div>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        <Button
+          variant="outline"
+          className="!text-xs"
+          disabled={renewing || !host.billing_renewal_at}
+          onClick={onRenew}
+        >
+          {renewing ? 'Renewing…' : 'Mark paid · renew period'}
+        </Button>
+        <span className="font-mono text-[10px] text-muted">
+          After you pay the provider — advances next due date by one cycle
+        </span>
+      </div>
     </div>
   )
 }
@@ -618,6 +670,7 @@ function HostEditorModal({
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hosts'] })
+      void qc.invalidateQueries({ queryKey: ['billing'] })
       toast('Renewal advanced to next period', 'success')
       onClose()
     },
@@ -872,7 +925,7 @@ function HostEditorModal({
                   disabled={advanceMutation.isPending}
                   onClick={() => advanceMutation.mutate()}
                 >
-                  Advance to next period
+                  Mark paid · renew period
                 </Button>
               ) : null}
             </div>
