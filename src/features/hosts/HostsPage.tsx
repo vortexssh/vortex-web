@@ -676,7 +676,7 @@ function HostEditorModal({
               : Number(tariffRaw)
           const currency = haCurrency.trim().toUpperCase() || undefined
           await pluginsApi.setBinding(haInstallId, saved.id, {
-            entity_id: entity,
+            entity_id: entity.toLowerCase(),
             ...(tariff != null ? { tariff } : {}),
             ...(currency ? { currency } : {}),
           })
