@@ -1,5 +1,6 @@
 import type {
   ApiKey,
+  BillingPayer,
   Host,
   Tag,
   Task,
@@ -26,6 +27,8 @@ const tags: Tag[] = [
   { id: 'tag_dev', name: 'dev', color: '#22c55e', created_at: now() },
 ]
 
+const billingPayers: BillingPayer[] = []
+
 const hosts: Host[] = [
   {
     id: 'hst_edge_01',
@@ -46,6 +49,8 @@ const hosts: Host[] = [
     billing_currency: null,
     billing_auto_renew: true,
     billing_notes: null,
+    billing_payer_id: null,
+    payer: null,
     tags: [tags[0]!],
     agent: {
       id: 'agt_edge_01',
@@ -125,12 +130,14 @@ export const db = {
   },
   sessions,
   tags,
+  billingPayers,
   hosts,
   tasks,
   taskLogs,
   apiKeys,
   telemetryByHost,
   findHost: (id: string) => hosts.find((h) => h.id === id),
+  findPayer: (id: string) => billingPayers.find((p) => p.id === id),
   resolveTags: (ids: string[]) => tags.filter((t) => ids.includes(t.id)),
   issueToken: (userId: string) => {
     const token = `tok_${crypto.randomUUID()}`

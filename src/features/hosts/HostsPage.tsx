@@ -21,6 +21,7 @@ import { HostPluginMetricCell, HostPluginPanels } from '@/plugins/HostPluginPane
 import { findHaPowerInstallId, contributionAppliesToHost } from '@/plugins/EnergyCalendar'
 import { usePluginUiBundle, useSlotContributions } from '@/plugins/usePluginUiBundle'
 import { pluginsApi } from '@/services/pluginsApi'
+import { billingApi } from '@/services/billingApi'
 
 type EnrollState = {
   host: Host
@@ -501,6 +502,12 @@ function HostBillingExpand({ host }: { host: Host }) {
   }
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {host.payer ? (
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Payer</div>
+          <div className="text-sm text-fg-strong">{host.payer.name}</div>
+        </div>
+      ) : null}
       <div>
         <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Cycle</div>
         <div className="text-sm text-fg-strong">
@@ -581,6 +588,11 @@ function HostEditorModal({
     host?.billing_auto_renew ?? true,
   )
   const [billingNotes, setBillingNotes] = useState(host?.billing_notes ?? '')
+  const [billingPayerId, setBillingPayerId] = useState(host?.billing_payer_id ?? '')
+  const payersQuery = useQuery({
+    queryKey: ['billing', 'payers'],
+    queryFn: () => billingApi.listPayers(),
+  })
   const pluginBundle = usePluginUiBundle()
   const haInstallId = findHaPowerInstallId(pluginBundle.data?.installs)
   const haInstall = pluginBundle.data?.installs.find((i) => i.id === haInstallId)
@@ -626,8 +638,9 @@ function HostEditorModal({
             billing_currency: billingCurrency.toUpperCase(),
             billing_auto_renew: billingAutoRenew,
             billing_notes: billingNotes.trim() ? billingNotes.trim() : null,
+            billing_payer_id: billingPayerId || null,
           }
-        : { billing_enabled: false }
+        : { billing_enabled: false, billing_payer_id: null }
 
       const payload: CreateHostPayload = {
         name,
@@ -777,6 +790,21 @@ function HostEditorModal({
           />
           {billingEnabled ? (
             <div className="mt-3 flex flex-col gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs uppercase tracking-wider text-muted">Payer</span>
+                <select
+                  className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong"
+                  value={billingPayerId}
+                  onChange={(e) => setBillingPayerId(e.target.value)}
+                >
+                  <option value="">— none —</option>
+                  {(payersQuery.data ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-xs uppercase tracking-wider text-muted">Cycle</span>
                 <select

@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { billingApi } from '@/services/billingApi'
 import type { BillingHostBrief } from '@/types'
 import { countryFlag } from '@/lib/countryFlag'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { ApiError } from '@/services/apiClient'
+import { toast } from '@/components/ui/Toast'
 
 function monthLabel(year: number, month: number) {
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en', {
@@ -29,22 +32,50 @@ function todayIso() {
 }
 
 export function BillingPage() {
+  const qc = useQueryClient()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [selectedPayerId, setSelectedPayerId] = useState<string>('')
+  const [newPayerName, setNewPayerName] = useState('')
   const today = todayIso()
+
+  const payerFilter = selectedPayerId || undefined
+
+  const payersQuery = useQuery({
+    queryKey: ['billing', 'payers'],
+    queryFn: () => billingApi.listPayers(),
+  })
+
+  const payerDetailQuery = useQuery({
+    queryKey: ['billing', 'payers', selectedPayerId],
+    queryFn: () => billingApi.getPayer(selectedPayerId),
+    enabled: Boolean(selectedPayerId),
+  })
 
   const from = `${year}-${String(month).padStart(2, '0')}-01`
   const to = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth(year, month)).padStart(2, '0')}`
 
   const calendarQuery = useQuery({
-    queryKey: ['billing', 'calendar', year, month],
-    queryFn: () => billingApi.calendar(year, month),
+    queryKey: ['billing', 'calendar', year, month, selectedPayerId],
+    queryFn: () => billingApi.calendar(year, month, payerFilter),
   })
   const summaryQuery = useQuery({
-    queryKey: ['billing', 'summary', from, to],
-    queryFn: () => billingApi.summary(from, to),
+    queryKey: ['billing', 'summary', from, to, selectedPayerId],
+    queryFn: () => billingApi.summary(from, to, payerFilter),
+  })
+
+  const createPayerMutation = useMutation({
+    mutationFn: (name: string) => billingApi.createPayer({ name }),
+    onSuccess: (p) => {
+      void qc.invalidateQueries({ queryKey: ['billing', 'payers'] })
+      setSelectedPayerId(p.id)
+      setNewPayerName('')
+      toast(`Payer «${p.name}» created`, 'success')
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Could not create payer', 'error'),
   })
 
   const byDate = useMemo(() => {
@@ -81,9 +112,87 @@ export function BillingPage() {
 
   const selectedHosts = selectedDay ? (byDate.get(selectedDay) ?? []) : []
   const currency = summaryQuery.data?.currency ?? calendarQuery.data?.currency ?? 'USD'
+  const activePayerName =
+    selectedPayerId
+      ? (payersQuery.data?.find((p) => p.id === selectedPayerId)?.name ??
+        payerDetailQuery.data?.name)
+      : null
 
   return (
     <div className="flex flex-col gap-6">
+      <section className="rounded-lg border border-border bg-panel p-4">
+        <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">Payer</h3>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-sm min-w-[12rem]">
+            <span className="text-xs uppercase tracking-wider text-muted">Filter by payer</span>
+            <select
+              className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong"
+              value={selectedPayerId}
+              onChange={(e) => {
+                setSelectedPayerId(e.target.value)
+                setSelectedDay(null)
+              }}
+            >
+              <option value="">All payers</option>
+              {(payersQuery.data ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.host_count})
+                </option>
+              ))}
+            </select>
+          </label>
+          <Input
+            label="New payer"
+            value={newPayerName}
+            onChange={(e) => setNewPayerName(e.target.value)}
+            placeholder="Company / person"
+            className="max-w-xs"
+          />
+          <Button
+            variant="outline"
+            disabled={!newPayerName.trim() || createPayerMutation.isPending}
+            onClick={() => createPayerMutation.mutate(newPayerName.trim())}
+          >
+            Add payer
+          </Button>
+        </div>
+        {selectedPayerId && payerDetailQuery.data ? (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-fg-strong">
+                {payerDetailQuery.data.name}
+              </span>
+              <Badge tone="muted">{payerDetailQuery.data.host_count} hosts</Badge>
+            </div>
+            {payerDetailQuery.data.notes ? (
+              <p className="mb-3 text-sm text-dim">{payerDetailQuery.data.notes}</p>
+            ) : null}
+            {payerDetailQuery.data.hosts.length === 0 ? (
+              <p className="font-mono text-xs text-muted">No hosts linked — assign in host Edit.</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {payerDetailQuery.data.hosts.map((h) => (
+                  <li
+                    key={h.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-void px-3 py-2 font-mono text-xs"
+                  >
+                    <span className="flex items-center gap-2 text-fg-strong">
+                      <span>{countryFlag(h.country_code)}</span>
+                      {h.name}
+                    </span>
+                    <span className="text-muted">
+                      {h.billing_enabled
+                        ? `${h.billing_amount ?? '—'} ${h.billing_currency ?? ''} · due ${h.billing_renewal_at ?? '—'}`
+                        : 'billing off'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+      </section>
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="font-mono text-xs uppercase tracking-wider text-muted">Spend</h2>
@@ -92,6 +201,7 @@ export function BillingPage() {
             <span className="font-mono text-base text-neon">{currency}</span>
           </p>
           <p className="mt-1 font-mono text-xs text-muted">
+            {activePayerName ? `Payer: ${activePayerName} · ` : ''}
             Next renewals in {monthLabel(year, month)} · projected periods shown dimmed
           </p>
         </div>
@@ -165,7 +275,7 @@ export function BillingPage() {
                   {hosts.slice(0, 3).map((h) => (
                     <span
                       key={`${h.id}-${h.is_next ? 'n' : 'p'}`}
-                      title={`${h.name}${h.is_next ? '' : ' (projected)'}`}
+                      title={`${h.name}${h.payer_name ? ` · ${h.payer_name}` : ''}${h.is_next ? '' : ' (projected)'}`}
                       className={`text-sm leading-none ${h.is_next ? '' : 'opacity-35 grayscale'}`}
                     >
                       {countryFlag(h.country_code)}
@@ -214,6 +324,11 @@ export function BillingPage() {
                   </span>
                   <div>
                     <span className="text-sm text-fg-strong">{h.name}</span>
+                    {h.payer_name ? (
+                      <span className="ml-2 font-mono text-[10px] text-muted">
+                        {h.payer_name}
+                      </span>
+                    ) : null}
                     {!h.is_next ? (
                       <span className="ml-2 font-mono text-[10px] uppercase text-muted">
                         projected

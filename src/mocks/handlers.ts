@@ -248,6 +248,14 @@ export const handlers = [
       billing_currency: body.billing_currency ?? null,
       billing_auto_renew: body.billing_auto_renew ?? true,
       billing_notes: body.billing_notes ?? null,
+      billing_payer_id: body.billing_payer_id ?? null,
+      payer:
+        body.billing_payer_id
+          ? (() => {
+              const p = db.findPayer(body.billing_payer_id!)
+              return p ? { id: p.id, name: p.name } : null
+            })()
+          : null,
       is_hidden: body.is_hidden ?? false,
       sort_order: db.hosts.length,
       is_proxy_enabled: body.is_proxy_enabled ?? false,
@@ -302,6 +310,19 @@ export const handlers = [
           : body.billing_auto_renew,
       billing_notes:
         body.billing_notes === undefined ? host.billing_notes : body.billing_notes,
+      billing_payer_id:
+        body.billing_payer_id === undefined
+          ? host.billing_payer_id
+          : body.billing_payer_id,
+      payer:
+        body.billing_payer_id === undefined
+          ? host.payer
+          : body.billing_payer_id
+            ? (() => {
+                const p = db.findPayer(body.billing_payer_id!)
+                return p ? { id: p.id, name: p.name } : null
+              })()
+            : null,
       updated_at: new Date().toISOString(),
     })
     return HttpResponse.json(host)
@@ -566,8 +587,10 @@ export const handlers = [
     const url = new URL(request.url)
     const year = Number(url.searchParams.get('year'))
     const month = Number(url.searchParams.get('month'))
+    const payerId = url.searchParams.get('payer_id')
     const days = db.hosts
       .filter((h) => h.billing_enabled && h.billing_renewal_at)
+      .filter((h) => !payerId || h.billing_payer_id === payerId)
       .filter((h) => {
         const d = h.billing_renewal_at!
         return d.startsWith(`${year}-${String(month).padStart(2, '0')}`)
@@ -597,8 +620,11 @@ export const handlers = [
 
   http.get('/api/v1/billing/summary', ({ request }) => {
     if (!authUser(request)) return unauthorized()
+    const url = new URL(request.url)
+    const payerId = url.searchParams.get('payer_id')
     const items = db.hosts
       .filter((h) => h.billing_enabled && h.billing_amount)
+      .filter((h) => !payerId || h.billing_payer_id === payerId)
       .map((h) => ({
         host_id: h.id,
         host_name: h.name,
@@ -609,7 +635,6 @@ export const handlers = [
         cycle: h.billing_cycle,
       }))
     const total = items.reduce((acc, i) => acc + Number(i.amount), 0)
-    const url = new URL(request.url)
     return HttpResponse.json({
       currency: db.getUser().preferred_currency,
       from_date: url.searchParams.get('from'),
@@ -618,6 +643,77 @@ export const handlers = [
       items,
       skipped: [],
     })
+  }),
+
+  http.get('/api/v1/billing/payers', ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    return HttpResponse.json(
+      db.billingPayers.map((p) => ({
+        ...p,
+        host_count: db.hosts.filter((h) => h.billing_payer_id === p.id).length,
+      })),
+    )
+  }),
+
+  http.post('/api/v1/billing/payers', async ({ request }) => {
+    if (!authUser(request)) return unauthorized()
+    const body = (await request.json()) as { name: string; notes?: string | null }
+    const payer = {
+      id: db.uid('pay'),
+      name: body.name.trim(),
+      notes: body.notes ?? null,
+      host_count: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    db.billingPayers.push(payer)
+    return HttpResponse.json(payer, { status: 201 })
+  }),
+
+  http.get('/api/v1/billing/payers/:id', ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const payer = db.findPayer(String(params.id))
+    if (!payer) return bad('Billing payer not found', 'payer_not_found', 404)
+    const hosts = db.hosts
+      .filter((h) => h.billing_payer_id === payer.id)
+      .map((h) => ({
+        id: h.id,
+        name: h.name,
+        billing_enabled: h.billing_enabled,
+        billing_amount: h.billing_amount,
+        billing_currency: h.billing_currency,
+        billing_renewal_at: h.billing_renewal_at,
+        billing_cycle: h.billing_cycle,
+        billing_auto_renew: h.billing_auto_renew,
+        country_code: h.country_code,
+      }))
+    return HttpResponse.json({ ...payer, host_count: hosts.length, hosts })
+  }),
+
+  http.patch('/api/v1/billing/payers/:id', async ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const payer = db.findPayer(String(params.id))
+    if (!payer) return bad('Billing payer not found', 'payer_not_found', 404)
+    const body = (await request.json()) as { name?: string; notes?: string | null }
+    if (body.name !== undefined) payer.name = body.name.trim()
+    if (body.notes !== undefined) payer.notes = body.notes
+    payer.updated_at = new Date().toISOString()
+    payer.host_count = db.hosts.filter((h) => h.billing_payer_id === payer.id).length
+    return HttpResponse.json(payer)
+  }),
+
+  http.delete('/api/v1/billing/payers/:id', ({ request, params }) => {
+    if (!authUser(request)) return unauthorized()
+    const idx = db.billingPayers.findIndex((p) => p.id === String(params.id))
+    if (idx < 0) return bad('Billing payer not found', 'payer_not_found', 404)
+    db.billingPayers.splice(idx, 1)
+    for (const h of db.hosts) {
+      if (h.billing_payer_id === String(params.id)) {
+        h.billing_payer_id = null
+        h.payer = null
+      }
+    }
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.post('/api/v1/hosts/:id/billing/advance', ({ request, params }) => {

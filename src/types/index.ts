@@ -23,6 +23,32 @@ export interface HostBillingFields {
   billing_currency?: string | null
   billing_auto_renew?: boolean
   billing_notes?: string | null
+  billing_payer_id?: string | null
+}
+
+export interface BillingPayer {
+  id: string
+  name: string
+  notes: string | null
+  host_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BillingPayerHostBrief {
+  id: string
+  name: string
+  billing_enabled: boolean
+  billing_amount: string | null
+  billing_currency: string | null
+  billing_renewal_at: string | null
+  billing_cycle: BillingCycle | null
+  billing_auto_renew: boolean
+  country_code: string | null
+}
+
+export interface BillingPayerDetail extends BillingPayer {
+  hosts: BillingPayerHostBrief[]
 }
 
 export interface RegisterResponse {
@@ -91,6 +117,8 @@ export interface Host {
   billing_currency: string | null
   billing_auto_renew: boolean
   billing_notes: string | null
+  billing_payer_id: string | null
+  payer: { id: string; name: string } | null
   tags: Tag[]
   agent: Agent | null
   created_at: string
@@ -183,6 +211,8 @@ export interface BillingHostBrief {
   country_code: string | null
   is_next: boolean
   cycle: string | null
+  payer_id: string | null
+  payer_name: string | null
 }
 
 export interface BillingDay {
@@ -195,6 +225,8 @@ export interface BillingCalendarResponse {
   month: number
   currency: string
   days: BillingDay[]
+  payer_id: string | null
+  payer_name: string | null
 }
 
 export interface BillingSummaryItem {
@@ -214,6 +246,8 @@ export interface BillingSummaryResponse {
   total: string
   items: BillingSummaryItem[]
   skipped: string[]
+  payer_id: string | null
+  payer_name: string | null
 }
 
 /** Public status page (no IPs / SSH metadata). */

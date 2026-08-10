@@ -1,6 +1,8 @@
 import { apiRequest } from './apiClient'
 import type {
   BillingCalendarResponse,
+  BillingPayer,
+  BillingPayerDetail,
   BillingSummaryResponse,
   NotificationSettings,
   AppNotification,
@@ -9,14 +11,39 @@ import type {
 } from '@/types'
 
 export const billingApi = {
-  summary(from: string, to: string): Promise<BillingSummaryResponse> {
+  summary(from: string, to: string, payerId?: string): Promise<BillingSummaryResponse> {
     const q = new URLSearchParams({ from, to })
+    if (payerId) q.set('payer_id', payerId)
     return apiRequest<BillingSummaryResponse>(`/billing/summary?${q}`)
   },
 
-  calendar(year: number, month: number): Promise<BillingCalendarResponse> {
+  calendar(year: number, month: number, payerId?: string): Promise<BillingCalendarResponse> {
     const q = new URLSearchParams({ year: String(year), month: String(month) })
+    if (payerId) q.set('payer_id', payerId)
     return apiRequest<BillingCalendarResponse>(`/billing/calendar?${q}`)
+  },
+
+  listPayers(): Promise<BillingPayer[]> {
+    return apiRequest<BillingPayer[]>('/billing/payers')
+  },
+
+  getPayer(payerId: string): Promise<BillingPayerDetail> {
+    return apiRequest<BillingPayerDetail>(`/billing/payers/${payerId}`)
+  },
+
+  createPayer(payload: { name: string; notes?: string | null }) {
+    return apiRequest<BillingPayer>('/billing/payers', { method: 'POST', body: payload })
+  },
+
+  updatePayer(payerId: string, payload: { name?: string; notes?: string | null }) {
+    return apiRequest<BillingPayer>(`/billing/payers/${payerId}`, {
+      method: 'PATCH',
+      body: payload,
+    })
+  },
+
+  removePayer(payerId: string) {
+    return apiRequest<void>(`/billing/payers/${payerId}`, { method: 'DELETE' })
   },
 
   advance(hostId: string) {
