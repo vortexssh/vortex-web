@@ -5,6 +5,7 @@ import { ApiError } from '@/services/apiClient'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
+import { Toggle } from '@/components/ui/Toggle'
 import { toast, toastCopy } from '@/components/ui/Toast'
 
 const SAMPLE_MANIFEST = {
@@ -145,6 +146,20 @@ export function PluginsManager() {
       toast(err instanceof ApiError ? err.message : 'Remove failed', 'error'),
   })
 
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      pluginsApi.update(id, { status: enabled ? 'active' : 'disabled' }),
+    onSuccess: (row) => {
+      void qc.invalidateQueries({ queryKey: ['plugins'] })
+      toast(
+        row.status === 'active' ? `«${row.name}» enabled` : `«${row.name}» disabled`,
+        'success',
+      )
+    },
+    onError: (err: unknown) =>
+      toast(err instanceof ApiError ? err.message : 'Could not update plugin', 'error'),
+  })
+
   function onFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) {
@@ -197,21 +212,31 @@ export function PluginsManager() {
             {(listQuery.data ?? []).map((p) => (
               <li
                 key={p.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-void px-3 py-2"
+                className={`flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-void px-3 py-2 ${
+                  p.status !== 'active' ? 'opacity-70' : ''
+                }`}
               >
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm text-fg-strong">{p.name}</div>
                   <div className="font-mono text-[11px] text-muted">
                     {p.plugin_id} · v{p.version}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Toggle
+                    checked={p.status === 'active'}
+                    disabled={toggleMutation.isPending}
+                    label={p.status === 'active' ? 'On' : 'Off'}
+                    onChange={(enabled) =>
+                      toggleMutation.mutate({ id: p.id, enabled })
+                    }
+                  />
                   <Badge tone={p.is_daemon_online ? 'neon' : 'warn'}>
                     {p.is_daemon_online ? 'daemon online' : 'daemon offline'}
                   </Badge>
-                  <Badge>{p.status}</Badge>
                   <Button
                     type="button"
+                    variant="danger"
                     onClick={() => removeMutation.mutate(p.id)}
                   >
                     Remove

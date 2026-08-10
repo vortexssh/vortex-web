@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/services/authApi'
@@ -71,18 +71,24 @@ export function SettingsPage() {
   const pluginTabs = useSlotContributions('settings.tabs')
   const bundle = usePluginUiBundle()
 
-  const tabs = [
-    ...TABS,
-    ...pluginTabs.map((c) => ({
-      id: `plugin:${c.install_id}:${c.contribution_id}` as SettingsTab,
-      label: c.payload.label ? String(c.payload.label) : c.plugin_name,
-    })),
-  ]
+  const pluginSettingsTabs = pluginTabs.map((c) => ({
+    id: `plugin:${c.install_id}:${c.contribution_id}` as SettingsTab,
+    label: c.payload.label ? String(c.payload.label) : c.plugin_name,
+  }))
+
+  useEffect(() => {
+    if (!tab.startsWith('plugin:')) return
+    if (bundle.isLoading) return
+    const exists = pluginTabs.some(
+      (c) => `plugin:${c.install_id}:${c.contribution_id}` === tab,
+    )
+    if (!exists) setTab('plugins')
+  }, [tab, pluginTabs, bundle.isLoading])
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 lg:flex-row">
       <nav className="flex shrink-0 flex-row gap-1 overflow-x-auto lg:w-44 lg:flex-col">
-        {tabs.map((t) => (
+        {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -96,6 +102,28 @@ export function SettingsPage() {
             {t.label}
           </button>
         ))}
+
+        {pluginSettingsTabs.length > 0 ? (
+          <div className="mt-2 flex flex-col gap-1 border-t border-border pt-3 lg:mt-3">
+            <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+              Plugin settings
+            </div>
+            {pluginSettingsTabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                  tab === t.id
+                    ? 'border-neon/40 bg-neon/10 text-neon border-glow'
+                    : 'border-transparent text-dim hover:border-border-active hover:bg-panel'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </nav>
 
       <div className="min-w-0 flex-1">
