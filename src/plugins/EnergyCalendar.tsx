@@ -57,7 +57,7 @@ export function EnergyCalendar({
   }, [byDay])
 
   const monthLabel = new Date(cursor.year, cursor.month, 1).toLocaleString(undefined, {
-    month: 'long',
+    month: 'short',
     year: 'numeric',
   })
 
@@ -74,11 +74,11 @@ export function EnergyCalendar({
       : undefined
 
   return (
-    <div className="rounded-md border border-border bg-panel p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="w-full max-w-[220px] rounded border border-border bg-panel p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-1">
         <button
           type="button"
-          className="font-mono text-xs text-muted hover:text-neon"
+          className="px-1 font-mono text-[10px] text-muted hover:text-neon"
           onClick={() =>
             setCursor((c) => {
               const m = c.month - 1
@@ -88,15 +88,15 @@ export function EnergyCalendar({
         >
           ←
         </button>
-        <div className="text-center">
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+        <div className="min-w-0 text-center">
+          <div className="truncate font-mono text-[9px] uppercase tracking-wider text-muted">
             Energy · {unit}
           </div>
-          <div className="text-sm text-fg-strong">{monthLabel}</div>
+          <div className="truncate text-[11px] text-fg-strong">{monthLabel}</div>
         </div>
         <button
           type="button"
-          className="font-mono text-xs text-muted hover:text-neon"
+          className="px-1 font-mono text-[10px] text-muted hover:text-neon"
           onClick={() =>
             setCursor((c) => {
               const m = c.month + 1
@@ -108,30 +108,30 @@ export function EnergyCalendar({
         </button>
       </div>
 
-      <div className="mb-2 grid grid-cols-2 gap-2 font-mono text-[11px]">
+      <div className="mb-1.5 grid grid-cols-2 gap-1 font-mono text-[10px]">
         <div>
           <div className="text-muted">Today</div>
           <div className="text-neon">
-            {todayVal == null ? '—' : `${todayVal.toFixed(2)} ${unit}`}
+            {todayVal == null ? '—' : todayVal.toFixed(2)}
           </div>
         </div>
         <div>
           <div className="text-muted">Month</div>
-          <div className="text-neon">{monthTotal.toFixed(2)} {unit}</div>
+          <div className="text-neon">{monthTotal.toFixed(2)}</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
+      <div className="grid grid-cols-7 gap-px">
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
           <div
-            key={d}
-            className="text-center font-mono text-[9px] uppercase text-muted"
+            key={`${d}${i}`}
+            className="text-center font-mono text-[8px] uppercase text-muted"
           >
             {d}
           </div>
         ))}
         {cells.map((c) => {
-          if (c.day == null) return <div key={c.key} />
+          if (c.day == null) return <div key={c.key} className="h-5" />
           const key = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`
           const val = byDay.get(key)
           const intensity = val == null ? 0 : Math.min(1, val / max)
@@ -139,7 +139,7 @@ export function EnergyCalendar({
             <div
               key={c.key}
               title={val == null ? key : `${key}: ${val.toFixed(3)} ${unit}`}
-              className="flex aspect-square flex-col items-center justify-center rounded border border-border/60 font-mono text-[9px]"
+              className="flex h-5 items-center justify-center rounded-[2px] border border-border/50 font-mono text-[8px] leading-none"
               style={{
                 background:
                   val == null
@@ -148,15 +148,15 @@ export function EnergyCalendar({
               }}
             >
               <span className="text-dim">{c.day}</span>
-              {val != null ? (
-                <span className="text-[8px] text-neon">{val < 10 ? val.toFixed(1) : Math.round(val)}</span>
-              ) : null}
             </div>
           )
         })}
       </div>
       {query.isLoading ? (
-        <p className="mt-2 font-mono text-[10px] text-muted">loading calendar…</p>
+        <p className="mt-1 font-mono text-[9px] text-muted">loading…</p>
+      ) : null}
+      {query.isError ? (
+        <p className="mt-1 font-mono text-[9px] text-danger">calendar failed</p>
       ) : null}
     </div>
   )

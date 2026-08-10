@@ -24,25 +24,35 @@ export function DeclarativeView({
   onStateChange,
 }: DeclarativeViewProps) {
   const [actionResult, setActionResult] = useState<Record<string, unknown> | undefined>()
+  const [busyAction, setBusyAction] = useState<string | null>(null)
   const mergedCtx = useMemo(
     () => ({ ...ctx, actionResult: actionResult ?? ctx.actionResult }),
     [ctx, actionResult],
   )
 
-  if (!node || typeof node !== 'object') return null
-  if (!evalCondition(node.visibleIf, mergedCtx)) return null
-
   async function runAction(action?: string, params: Record<string, unknown> = {}) {
-    if (!action) return
+    if (!action || busyAction) return
+    setBusyAction(action)
     try {
       const res = await pluginsApi.rpc(installId, action, params, hostId)
-      setActionResult(res.result)
+      setActionResult(res.result ?? {})
       onStateChange?.()
-      toast('Action completed', 'success')
+      const bound = res.result?.bound_count
+      toast(
+        typeof bound === 'number'
+          ? `Refreshed · ${bound} host${bound === 1 ? '' : 's'}`
+          : 'Action completed',
+        'success',
+      )
     } catch (err) {
       toast(err instanceof ApiError ? err.message : 'Action failed', 'error')
+    } finally {
+      setBusyAction(null)
     }
   }
+
+  if (!node || typeof node !== 'object') return null
+  if (!evalCondition(node.visibleIf, mergedCtx)) return null
 
   const t = node.type
   const children = node.children ?? []
@@ -226,19 +236,21 @@ export function DeclarativeView({
 
   if (t === 'button' || t === 'confirm') {
     const enabled = evalCondition(node.enableIf, mergedCtx)
+    const action = node.action
+    const thisBusy = Boolean(action && busyAction === action)
     return (
       <Button
         type="button"
-        disabled={!enabled}
+        disabled={!enabled || busyAction != null}
         onClick={() => {
           if (t === 'confirm') {
             const ok = window.confirm(node.confirmMessage ?? 'Are you sure?')
             if (!ok) return
           }
-          void runAction(node.action)
+          void runAction(action)
         }}
       >
-        {node.label ?? 'Run'}
+        {thisBusy ? 'Working…' : (node.label ?? 'Run')}
       </Button>
     )
   }

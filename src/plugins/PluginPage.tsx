@@ -67,14 +67,16 @@ export function PluginPage() {
         }}
         onStateChange={() => {
           void qc.invalidateQueries({ queryKey: ['plugins', 'state', install.id] })
+          void qc.invalidateQueries({ queryKey: ['plugins', 'daily', install.id] })
+          void qc.invalidateQueries({ queryKey: ['plugins'] })
         }}
       />
       {showEnergy ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex max-w-xs flex-col gap-2">
           <label className="flex flex-col gap-1 text-xs text-muted">
             Calendar host
             <select
-              className="rounded-md border border-border bg-void px-3 py-2 font-mono text-sm text-fg-strong"
+              className="rounded-md border border-border bg-void px-2 py-1.5 font-mono text-xs text-fg-strong"
               value={calendarHostId}
               onChange={(e) => setCalendarHostId(e.target.value)}
             >

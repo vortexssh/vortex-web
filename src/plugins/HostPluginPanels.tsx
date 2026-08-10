@@ -43,11 +43,16 @@ export function HostPluginPanels({ host }: { host: Host }) {
             void qc.invalidateQueries({
               queryKey: ['plugins', 'state', c.install_id, host.id],
             })
+            void qc.invalidateQueries({
+              queryKey: ['plugins', 'daily', c.install_id],
+            })
           }}
         />
       ))}
       {haBound && haInstallId ? (
-        <EnergyCalendar installId={haInstallId} hostId={host.id} />
+        <div className="max-w-[220px]">
+          <EnergyCalendar installId={haInstallId} hostId={host.id} />
+        </div>
       ) : null}
     </div>
   )
