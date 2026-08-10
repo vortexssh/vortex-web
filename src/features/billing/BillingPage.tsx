@@ -94,6 +94,39 @@ export function BillingPage() {
     ? payersQuery.data?.find((p) => p.id === selectedPayerId)?.name
     : null
 
+  const monthStats = useMemo(() => {
+    let total = 0
+    let remaining = 0
+    let counted = 0
+    for (const day of calendarQuery.data?.days ?? []) {
+      for (const h of day.hosts) {
+        if (h.amount_converted == null) continue
+        const amt = Number(h.amount_converted)
+        if (!Number.isFinite(amt)) continue
+        counted += 1
+        total += amt
+        // Future dates + overdue next renewals still count as unpaid.
+        if (day.date >= today || h.is_next) remaining += amt
+      }
+    }
+    return {
+      total,
+      remaining,
+      counted,
+      ready: Boolean(calendarQuery.data),
+    }
+  }, [calendarQuery.data, today])
+
+  function formatMoney(n: number) {
+    return n.toLocaleString('en', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  }
+
+  const viewingCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1
+
   return (
     <div className="flex flex-col gap-6">
       <section className="rounded-lg border border-border bg-panel p-4">
@@ -127,16 +160,33 @@ export function BillingPage() {
       </section>
 
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="font-mono text-xs uppercase tracking-wider text-muted">Spend</h2>
-          <p className="mt-1 text-2xl font-semibold text-fg-strong">
-            {summaryQuery.data?.total ?? '—'}{' '}
-            <span className="font-mono text-base text-neon">{currency}</span>
-          </p>
-          <p className="mt-1 font-mono text-xs text-muted">
-            {activePayerName ? `Payer: ${activePayerName} · ` : ''}
-            Next renewals in {monthLabel(year, month)} · projected periods shown dimmed
-          </p>
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-panel px-4 py-3">
+            <h2 className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              {viewingCurrentMonth ? 'Left to pay this month' : 'Upcoming in this month'}
+            </h2>
+            <p className="mt-1 text-2xl font-semibold text-fg-strong">
+              {monthStats.ready ? formatMoney(monthStats.remaining) : '—'}{' '}
+              <span className="font-mono text-base text-neon">{currency}</span>
+            </p>
+            <p className="mt-1 font-mono text-[10px] text-muted">
+              From today forward
+              {viewingCurrentMonth ? ' · includes overdue' : ''}
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-panel px-4 py-3">
+            <h2 className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              Total this month
+            </h2>
+            <p className="mt-1 text-2xl font-semibold text-fg-strong">
+              {monthStats.ready ? formatMoney(monthStats.total) : '—'}{' '}
+              <span className="font-mono text-base text-neon">{currency}</span>
+            </p>
+            <p className="mt-1 font-mono text-[10px] text-muted">
+              {activePayerName ? `Payer: ${activePayerName} · ` : ''}
+              All renewals in {monthLabel(year, month)}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={() => shiftMonth(-1)}>
