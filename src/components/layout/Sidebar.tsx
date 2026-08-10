@@ -15,6 +15,7 @@ import {
 import { useAuthStore } from '@/store/authStore'
 import { useSlotContributions } from '@/plugins/usePluginUiBundle'
 import { pluginRouteToPath } from '@/plugins/bindings'
+import { userSatisfies2faPolicy } from '@/lib/twoFactorPolicy'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true, needs2fa: true },
@@ -32,7 +33,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
-  const is2faEnabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
+  const user = useAuthStore((s) => s.user)
+  const twoFaOk = userSatisfies2faPolicy(user)
   const pluginNav = useSlotContributions('nav.items')
 
   return (
@@ -69,7 +71,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         <nav className="flex flex-1 flex-col gap-1 p-3">
           {NAV_ITEMS.map(({ to, label, icon: Icon, needs2fa, ...rest }) => {
-            const locked = needs2fa && !is2faEnabled
+            const locked = needs2fa && !twoFaOk
             return (
               <NavLink
                 key={to}

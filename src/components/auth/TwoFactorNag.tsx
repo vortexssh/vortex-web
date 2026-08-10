@@ -2,11 +2,12 @@ import { Link } from 'react-router-dom'
 import { ShieldAlert } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/Button'
+import { userSatisfies2faPolicy } from '@/lib/twoFactorPolicy'
 
-/** Persistent nudge — agent features stay locked until TOTP is on. */
+/** Persistent nudge — agent features stay locked until TOTP is on (unless require_2fa=false). */
 export function TwoFactorNag() {
-  const enabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
-  if (enabled) return null
+  const user = useAuthStore((s) => s.user)
+  if (userSatisfies2faPolicy(user)) return null
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warn/30 bg-warn/10 px-4 py-2 sm:px-6">

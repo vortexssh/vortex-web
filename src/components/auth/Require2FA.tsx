@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
+import { userSatisfies2faPolicy } from '@/lib/twoFactorPolicy'
 
 /**
  * Agent-facing routes only. Host inventory + settings stay available without 2FA
@@ -33,9 +34,9 @@ interface Require2FAProps {
 
 export function Require2FA({ children }: Require2FAProps) {
   const location = useLocation()
-  const is2faEnabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
+  const user = useAuthStore((s) => s.user)
 
-  if (isAgentProtectedPath(location.pathname) && !is2faEnabled) {
+  if (isAgentProtectedPath(location.pathname) && !userSatisfies2faPolicy(user)) {
     return (
       <Navigate to="/security/2fa" replace state={{ from: location.pathname }} />
     )

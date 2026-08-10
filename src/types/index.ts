@@ -3,6 +3,8 @@ export interface User {
   email: string
   public_slug: string | null
   is_2fa_enabled: boolean
+  /** When false, skip agent 2FA gates / login TOTP (debug). Default true from Core. */
+  require_2fa?: boolean
   is_email_verified: boolean
   is_active: boolean
   preferred_currency: string
