@@ -171,3 +171,36 @@ export function findHaPowerInstallId(
   )
   return row?.id ?? null
 }
+
+export function hostHasPluginBinding(
+  installs:
+    | Array<{
+        id: string
+        plugin_id?: string
+        host_bindings?: Array<{ host_id: string }>
+      }>
+    | undefined,
+  installId: string,
+  hostId: string,
+): boolean {
+  const inst = (installs ?? []).find((i) => i.id === installId)
+  return Boolean(inst?.host_bindings?.some((b) => b.host_id === hostId))
+}
+
+/** HA Power (and any contrib with requires_host_binding) only on bound hosts. */
+export function contributionAppliesToHost(
+  contrib: { install_id: string; plugin_id?: string; requires_host_binding?: boolean },
+  installs:
+    | Array<{
+        id: string
+        plugin_id?: string
+        host_bindings?: Array<{ host_id: string }>
+      }>
+    | undefined,
+  hostId: string,
+): boolean {
+  const needsBinding =
+    contrib.requires_host_binding === true || contrib.plugin_id === 'com.vortex.ha_power'
+  if (!needsBinding) return true
+  return hostHasPluginBinding(installs, contrib.install_id, hostId)
+}

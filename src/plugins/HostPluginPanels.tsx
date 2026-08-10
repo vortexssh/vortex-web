@@ -2,24 +2,37 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { pluginsApi } from '@/services/pluginsApi'
 import type { Host } from '@/types'
 import { DeclarativeView } from './DeclarativeView'
-import { EnergyCalendar, findHaPowerInstallId } from './EnergyCalendar'
+import {
+  EnergyCalendar,
+  contributionAppliesToHost,
+  findHaPowerInstallId,
+  hostHasPluginBinding,
+} from './EnergyCalendar'
 import { usePluginUiBundle, useSlotContributions } from './usePluginUiBundle'
 import type { DeclarativeNode } from './types'
 
 export function HostPluginPanels({ host }: { host: Host }) {
   const contribs = useSlotContributions('hosts.detail.panels')
   const bundle = usePluginUiBundle()
+  const installs = bundle.data?.installs
   const qc = useQueryClient()
-  const haInstallId = findHaPowerInstallId(bundle.data?.installs)
+  const haInstallId = findHaPowerInstallId(installs)
+  const haBound = Boolean(
+    haInstallId && hostHasPluginBinding(installs, haInstallId, host.id),
+  )
 
-  if (contribs.length === 0 && !haInstallId) return null
+  const visible = contribs.filter((c) =>
+    contributionAppliesToHost(c, installs, host.id),
+  )
+
+  if (visible.length === 0 && !haBound) return null
 
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-3">
       <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
         Plugin panels
       </div>
-      {contribs.map((c) => (
+      {visible.map((c) => (
         <HostPluginPanelItem
           key={`${c.install_id}:${c.contribution_id}`}
           host={host}
@@ -33,7 +46,7 @@ export function HostPluginPanels({ host }: { host: Host }) {
           }}
         />
       ))}
-      {haInstallId ? (
+      {haBound && haInstallId ? (
         <EnergyCalendar installId={haInstallId} hostId={host.id} />
       ) : null}
     </div>
@@ -78,17 +91,23 @@ export function HostPluginMetricCell({
   installId,
   bind,
   unit,
+  enabled = true,
 }: {
   host: Host
   installId: string
   bind: string
   unit?: string
+  /** When false (no host binding), render nothing — column stays empty for this row. */
+  enabled?: boolean
 }) {
   const stateQuery = useQuery({
     queryKey: ['plugins', 'state', installId, host.id],
     queryFn: () => pluginsApi.state(installId, host.id),
     refetchInterval: 15_000,
+    enabled,
   })
+
+  if (!enabled) return null
 
   const state = stateQuery.data?.state ?? {}
   const path = bind.startsWith('plugin.state.') ? bind.slice('plugin.state.'.length) : bind

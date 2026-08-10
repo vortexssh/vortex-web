@@ -18,7 +18,7 @@ import { buildAgentInstallBundle } from '@/features/hosts/agentInstall'
 import { countryFlag } from '@/lib/countryFlag'
 import { userSatisfies2faPolicy } from '@/lib/twoFactorPolicy'
 import { HostPluginMetricCell, HostPluginPanels } from '@/plugins/HostPluginPanels'
-import { findHaPowerInstallId } from '@/plugins/EnergyCalendar'
+import { findHaPowerInstallId, contributionAppliesToHost } from '@/plugins/EnergyCalendar'
 import { usePluginUiBundle, useSlotContributions } from '@/plugins/usePluginUiBundle'
 import { pluginsApi } from '@/services/pluginsApi'
 
@@ -64,6 +64,20 @@ export function HostsPage() {
   const [enroll, setEnroll] = useState<EnrollState | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const pluginColumns = useSlotContributions('hosts.table.columns')
+  const pluginBundle = usePluginUiBundle()
+  const pluginInstalls = pluginBundle.data?.installs
+
+  // Only keep plugin columns if at least one host is bound (avoids empty Power col for everyone).
+  const visiblePluginColumns = pluginColumns.filter((c) => {
+    const needsBinding =
+      c.requires_host_binding === true || c.plugin_id === 'com.vortex.ha_power'
+    if (!needsBinding) return true
+    return (pluginInstalls ?? []).some(
+      (inst) =>
+        inst.id === c.install_id &&
+        (inst.host_bindings?.length ?? 0) > 0,
+    )
+  })
 
   const filtered = useMemo(() => {
     let rows = hostsQuery.data ?? []
@@ -326,7 +340,7 @@ export function HostsPage() {
               </div>
             ),
           },
-          ...pluginColumns.map((c) => {
+          ...visiblePluginColumns.map((c) => {
             const col = (c.payload.column ?? {}) as {
               header?: string
               bind?: string
@@ -341,6 +355,7 @@ export function HostsPage() {
                   installId={c.install_id}
                   bind={col.bind ?? 'plugin.state.value'}
                   unit={col.unit}
+                  enabled={contributionAppliesToHost(c, pluginInstalls, h.id)}
                 />
               ),
             }
@@ -573,6 +588,7 @@ function HostEditorModal({
     host && haInstall
       ? haInstall.host_bindings.find((b) => b.host_id === host.id)?.config
       : undefined
+  const [haPowerEnabled, setHaPowerEnabled] = useState(Boolean(existingHaBinding))
   const [haEntityId, setHaEntityId] = useState(
     String(existingHaBinding?.entity_id ?? ''),
   )
@@ -644,8 +660,15 @@ function HostEditorModal({
         }
       }
       if (haInstallId) {
-        const entity = haEntityId.trim()
-        if (entity) {
+        if (!haPowerEnabled) {
+          if (host) {
+            await pluginsApi.deleteBinding(haInstallId, saved.id).catch(() => undefined)
+          }
+        } else {
+          const entity = haEntityId.trim()
+          if (!entity) {
+            throw new ApiError(422, 'validation_error', 'HA entity_id is required when HA Power is enabled')
+          }
           const tariffRaw = haTariff.trim()
           const tariff =
             tariffRaw === '' || Number.isNaN(Number(tariffRaw))
@@ -657,8 +680,6 @@ function HostEditorModal({
             ...(tariff != null ? { tariff } : {}),
             ...(currency ? { currency } : {}),
           })
-        } else if (host) {
-          await pluginsApi.deleteBinding(haInstallId, saved.id).catch(() => undefined)
         }
       }
       return saved
@@ -832,35 +853,49 @@ function HostEditorModal({
 
         {haInstallId ? (
           <div className="rounded-md border border-border bg-panel/50 p-3">
-            <Input
-              label="HA power entity (com.vortex.ha_power)"
-              value={haEntityId}
-              onChange={(e) => setHaEntityId(e.target.value)}
-              placeholder="sensor.xxx_total_energy or sensor.xxx_power"
+            <Toggle
+              label="HA Power (meter this host)"
+              checked={haPowerEnabled}
+              onChange={setHaPowerEnabled}
             />
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Input
-                label="Energy tariff / kWh"
-                type="number"
-                step="0.0001"
-                min={0}
-                value={haTariff}
-                onChange={(e) => setHaTariff(e.target.value)}
-                placeholder="e.g. 5.5"
-              />
-              <Input
-                label="Energy currency"
-                value={haCurrency}
-                onChange={(e) => setHaCurrency(e.target.value.toUpperCase())}
-                maxLength={8}
-                placeholder="RUB"
-              />
-            </div>
-            <p className="mt-1 font-mono text-[10px] text-muted">
-              Bind any entity from the plug device; daemon resolves power/energy/V/A
-              siblings. Tariff is per host (not rental billing). Leave entity empty to
-              unbind.
-            </p>
+            {haPowerEnabled ? (
+              <>
+                <Input
+                  className="mt-3"
+                  label="HA entity_id"
+                  value={haEntityId}
+                  onChange={(e) => setHaEntityId(e.target.value)}
+                  placeholder="sensor.xxx_total_energy or sensor.xxx_power"
+                  required
+                />
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Input
+                    label="Energy tariff / kWh"
+                    type="number"
+                    step="0.0001"
+                    min={0}
+                    value={haTariff}
+                    onChange={(e) => setHaTariff(e.target.value)}
+                    placeholder="e.g. 5.5"
+                  />
+                  <Input
+                    label="Energy currency"
+                    value={haCurrency}
+                    onChange={(e) => setHaCurrency(e.target.value.toUpperCase())}
+                    maxLength={8}
+                    placeholder="RUB"
+                  />
+                </div>
+                <p className="mt-1 font-mono text-[10px] text-muted">
+                  Bind any entity from the plug device; daemon resolves power/energy/V/A
+                  siblings. Tariff is per host (not rental billing).
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 font-mono text-[10px] text-muted">
+                Off — no Power column / panel / calendar on this host.
+              </p>
+            )}
           </div>
         ) : null}
 
