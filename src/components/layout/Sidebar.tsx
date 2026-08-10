@@ -93,31 +93,39 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
               </NavLink>
             )
           })}
-          {pluginNav.map((c) => {
-            const item = (c.payload.item ?? {}) as { label?: string; route?: string }
-            const to = pluginRouteToPath(
-              item.route ?? `plugin:${c.plugin_id}/home`,
-              c.plugin_id,
-            )
-            return (
-              <NavLink
-                key={`${c.install_id}:${c.contribution_id}`}
-                to={to}
-                onClick={onClose}
-                className={({ isActive }) =>
-                  [
-                    'group flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors',
-                    isActive
-                      ? 'border-neon/40 bg-neon/10 text-neon border-glow'
-                      : 'border-transparent text-dim hover:border-border-active hover:bg-panel hover:text-neon/80',
-                  ].join(' ')
-                }
-              >
-                <Puzzle className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="flex-1">{item.label ?? c.plugin_name}</span>
-              </NavLink>
-            )
-          })}
+
+          {pluginNav.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="px-3 pb-1 pt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+                Plugins
+              </div>
+              {pluginNav.map((c) => {
+                const item = (c.payload.item ?? {}) as { label?: string; route?: string }
+                const to = pluginRouteToPath(
+                  item.route ?? `plugin:${c.plugin_id}/home`,
+                  c.plugin_id,
+                )
+                return (
+                  <NavLink
+                    key={`${c.install_id}:${c.contribution_id}`}
+                    to={to}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      [
+                        'group flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors',
+                        isActive
+                          ? 'border-neon/40 bg-neon/10 text-neon border-glow'
+                          : 'border-transparent text-dim hover:border-border-active hover:bg-panel hover:text-neon/80',
+                      ].join(' ')
+                    }
+                  >
+                    <Puzzle className="h-4 w-4 shrink-0 opacity-80" />
+                    <span className="flex-1">{item.label ?? c.plugin_name}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
+          ) : null}
         </nav>
 
         <div className="border-t border-border p-3">

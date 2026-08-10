@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/services/authApi'
 import { billingApi } from '@/services/billingApi'
@@ -20,10 +20,12 @@ import { DeclarativeView } from '@/plugins/DeclarativeView'
 import { usePluginUiBundle, useSlotContributions } from '@/plugins/usePluginUiBundle'
 import { pluginsApi } from '@/services/pluginsApi'
 import type { DeclarativeNode } from '@/plugins/types'
+import { PayersSection } from '@/features/settings/PayersSection'
 
 type SettingsTab =
   | 'profile'
   | 'billing'
+  | 'payers'
   | 'notifications'
   | 'security'
   | 'appearance'
@@ -34,6 +36,7 @@ type SettingsTab =
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'billing', label: 'Billing' },
+  { id: 'payers', label: 'Payers' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'security', label: 'Security' },
   { id: 'appearance', label: 'Appearance' },
@@ -41,8 +44,30 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'plugins', label: 'Plugins' },
 ]
 
+function parseSettingsTab(raw: string | null): SettingsTab {
+  if (!raw) return 'profile'
+  if (
+    raw === 'profile' ||
+    raw === 'billing' ||
+    raw === 'payers' ||
+    raw === 'notifications' ||
+    raw === 'security' ||
+    raw === 'appearance' ||
+    raw === 'api-keys' ||
+    raw === 'plugins'
+  ) {
+    return raw
+  }
+  if (raw.startsWith('plugin:')) return raw as SettingsTab
+  return 'profile'
+}
+
 export function SettingsPage() {
-  const [tab, setTab] = useState<SettingsTab>('profile')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = parseSettingsTab(searchParams.get('tab'))
+  const setTab = (next: SettingsTab) => {
+    setSearchParams(next === 'profile' ? {} : { tab: next }, { replace: true })
+  }
   const pluginTabs = useSlotContributions('settings.tabs')
   const bundle = usePluginUiBundle()
 
@@ -76,6 +101,7 @@ export function SettingsPage() {
       <div className="min-w-0 flex-1">
         {tab === 'profile' ? <ProfileSection /> : null}
         {tab === 'billing' ? <BillingPrefsSection /> : null}
+        {tab === 'payers' ? <PayersSection /> : null}
         {tab === 'notifications' ? <NotificationsSection /> : null}
         {tab === 'security' ? <SecuritySection /> : null}
         {tab === 'appearance' ? <AppearanceSection /> : null}
@@ -187,6 +213,11 @@ function BillingPrefsSection() {
       </h2>
       <p className="mb-4 text-sm text-dim">
         Spend summaries and calendar convert host bills into this currency (Frankfurter rates).
+        Manage named payers in{' '}
+        <Link to="/settings?tab=payers" className="text-neon hover:underline">
+          Settings → Payers
+        </Link>
+        .
       </p>
       <form
         className="flex max-w-xs flex-col gap-3"
