@@ -69,44 +69,56 @@ function CompactMonth({ energy }: { energy: PublicEnergy }) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
   return (
-    <div>
-      <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
-        Energy calendar · {energy.unit}
+    <div className="rounded-md border border-border/70 bg-void/60 p-2.5">
+      <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-muted">
+        Energy · {energy.unit}
       </div>
       <div className="mb-2 grid grid-cols-2 gap-2 font-mono text-[11px]">
         <div>
-          <span className="text-muted">Today </span>
-          <span className="text-neon">
-            {energy.today_kwh == null ? '—' : `${energy.today_kwh.toFixed(2)}`}
-          </span>
+          <div className="text-muted">Today</div>
+          <div className="text-neon">
+            {energy.today_kwh == null ? '—' : energy.today_kwh.toFixed(2)}
+          </div>
         </div>
         <div>
-          <span className="text-muted">Month </span>
-          <span className="text-neon">
-            {energy.month_kwh == null ? '—' : `${energy.month_kwh.toFixed(2)}`}
-          </span>
+          <div className="text-muted">Month</div>
+          <div className="text-neon">
+            {energy.month_kwh == null ? '—' : energy.month_kwh.toFixed(2)}
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-0.5">
-        {cells.map((d, i) => {
-          if (d == null) return <div key={`e${i}`} />
-          const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-          const val = byDay.get(key)
-          const intensity = val == null ? 0 : Math.min(1, val / max)
-          return (
+      <div className="mx-auto w-full max-w-[220px]">
+        <div className="grid grid-cols-7 gap-px">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
             <div
-              key={key}
-              title={val == null ? key : `${key}: ${val.toFixed(3)} ${energy.unit}`}
-              className="aspect-square rounded-[2px] border border-border/40"
-              style={{
-                background:
-                  val == null
-                    ? 'transparent'
-                    : `rgba(57, 255, 20, ${0.1 + intensity * 0.5})`,
-              }}
-            />
-          )
-        })}
+              key={`${d}${i}`}
+              className="text-center font-mono text-[8px] uppercase text-muted"
+            >
+              {d}
+            </div>
+          ))}
+          {cells.map((d, i) => {
+            if (d == null) return <div key={`e${i}`} className="h-5" />
+            const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+            const val = byDay.get(key)
+            const intensity = val == null ? 0 : Math.min(1, val / max)
+            return (
+              <div
+                key={key}
+                title={val == null ? key : `${key}: ${val.toFixed(3)} ${energy.unit}`}
+                className="flex h-5 items-center justify-center rounded-[2px] border border-border/50 font-mono text-[8px] leading-none"
+                style={{
+                  background:
+                    val == null
+                      ? 'transparent'
+                      : `rgba(57, 255, 20, ${0.08 + intensity * 0.45})`,
+                }}
+              >
+                <span className="text-dim">{d}</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
@@ -118,7 +130,7 @@ function HostCard({ host }: { host: PublicHost }) {
   const energy = host.energy
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-border bg-panel p-4">
+    <article className="flex h-full flex-col gap-3 rounded-lg border border-border bg-panel p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -213,7 +225,7 @@ export function PublicStatusPage() {
         ) : null}
 
         {query.data && query.data.hosts.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid auto-rows-fr items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {query.data.hosts.map((h) => (
               <HostCard key={h.id} host={h} />
             ))}
