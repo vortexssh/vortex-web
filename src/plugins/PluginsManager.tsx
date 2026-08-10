@@ -1,10 +1,11 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pluginsApi } from '@/services/pluginsApi'
+import { pluginsApi, type PluginInstallCreated } from '@/services/pluginsApi'
 import { ApiError } from '@/services/apiClient'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { toast } from '@/components/ui/Toast'
+import { Modal } from '@/components/ui/Modal'
+import { toast, toastCopy } from '@/components/ui/Toast'
 
 const SAMPLE_MANIFEST = {
   id: 'com.example.fake_metrics',
@@ -113,7 +114,7 @@ export function PluginsManager() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const listQuery = useQuery({ queryKey: ['plugins'], queryFn: () => pluginsApi.list() })
   const [pending, setPending] = useState<PendingInstall | null>(null)
-  const [lastToken, setLastToken] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<PluginInstallCreated | null>(null)
 
   const installMutation = useMutation({
     mutationFn: async (source: PendingInstall) => {
@@ -124,9 +125,11 @@ export function PluginsManager() {
       return pluginsApi.install(source.manifest, { interval_seconds: 10 })
     },
     onSuccess: (created) => {
-      setLastToken(created.daemon_token)
+      setCredentials(created)
+      setPending(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
       void qc.invalidateQueries({ queryKey: ['plugins'] })
-      toast('Plugin installed — copy the daemon token', 'success')
+      toast('Plugin installed — save the daemon credentials', 'success')
     },
     onError: (err: unknown) =>
       toast(err instanceof ApiError ? err.message : 'Install failed', 'error'),
@@ -261,15 +264,83 @@ export function PluginsManager() {
             </Button>
           </div>
         </form>
-        {lastToken ? (
-          <div className="mt-3 rounded border border-neon/30 bg-neon/5 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-              Daemon token (copy now)
+      </section>
+
+      <Modal
+        open={Boolean(credentials)}
+        title="Plugin installed"
+        onClose={() => setCredentials(null)}
+        footer={<Button onClick={() => setCredentials(null)}>Done</Button>}
+      >
+        {credentials ? (
+          <div className="flex flex-col gap-4 text-sm text-dim">
+            <p>
+              Copy these values for the daemon env. The token is shown{' '}
+              <span className="text-neon">once</span> — Core only keeps a hash.
+            </p>
+
+            <div>
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+                Install ID
+              </div>
+              <code className="block break-all rounded-md border border-border bg-void px-3 py-2 font-mono text-xs text-fg-strong">
+                {credentials.id}
+              </code>
+              <Button
+                variant="outline"
+                className="mt-2 !text-xs"
+                onClick={() => {
+                  void toastCopy(credentials.id, 'Install ID copied')
+                }}
+              >
+                Copy install ID
+              </Button>
             </div>
-            <code className="mt-1 block break-all font-mono text-xs text-neon">{lastToken}</code>
+
+            <div>
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+                Daemon token
+              </div>
+              <code className="block break-all rounded-md border border-neon/30 bg-neon/5 px-3 py-2 font-mono text-xs text-neon">
+                {credentials.daemon_token}
+              </code>
+              <Button
+                variant="outline"
+                className="mt-2 !text-xs"
+                onClick={() => {
+                  void toastCopy(credentials.daemon_token, 'Daemon token copied')
+                }}
+              >
+                Copy daemon token
+              </Button>
+            </div>
+
+            <div className="rounded-md border border-border bg-void p-3 font-mono text-[11px] text-muted">
+              <div>
+                plugin · {credentials.plugin_id} v{credentials.version}
+              </div>
+              <div className="mt-1 text-[10px] text-dim">
+                VORTEX_INSTALL_ID={credentials.id}
+                <br />
+                VORTEX_DAEMON_TOKEN={credentials.daemon_token}
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="self-start !text-xs"
+              onClick={() => {
+                void toastCopy(
+                  `export VORTEX_INSTALL_ID=${credentials.id}\nexport VORTEX_DAEMON_TOKEN=${credentials.daemon_token}`,
+                  'Env exports copied',
+                )
+              }}
+            >
+              Copy both as env exports
+            </Button>
           </div>
         ) : null}
-      </section>
+      </Modal>
     </div>
   )
 }
