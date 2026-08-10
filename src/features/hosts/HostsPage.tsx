@@ -567,14 +567,19 @@ function HostEditorModal({
   const pluginBundle = usePluginUiBundle()
   const haInstallId = findHaPowerInstallId(pluginBundle.data?.installs)
   const haInstall = pluginBundle.data?.installs.find((i) => i.id === haInstallId)
-  const existingEntity =
+  const existingHaBinding =
     host && haInstall
-      ? String(
-          haInstall.host_bindings.find((b) => b.host_id === host.id)?.config?.entity_id ??
-            '',
-        )
-      : ''
-  const [haEntityId, setHaEntityId] = useState(existingEntity)
+      ? haInstall.host_bindings.find((b) => b.host_id === host.id)?.config
+      : undefined
+  const [haEntityId, setHaEntityId] = useState(
+    String(existingHaBinding?.entity_id ?? ''),
+  )
+  const [haTariff, setHaTariff] = useState(
+    existingHaBinding?.tariff != null ? String(existingHaBinding.tariff) : '',
+  )
+  const [haCurrency, setHaCurrency] = useState(
+    String(existingHaBinding?.currency ?? ''),
+  )
 
   const advanceMutation = useMutation({
     mutationFn: () => {
@@ -639,7 +644,17 @@ function HostEditorModal({
       if (haInstallId) {
         const entity = haEntityId.trim()
         if (entity) {
-          await pluginsApi.setBinding(haInstallId, saved.id, { entity_id: entity })
+          const tariffRaw = haTariff.trim()
+          const tariff =
+            tariffRaw === '' || Number.isNaN(Number(tariffRaw))
+              ? undefined
+              : Number(tariffRaw)
+          const currency = haCurrency.trim().toUpperCase() || undefined
+          await pluginsApi.setBinding(haInstallId, saved.id, {
+            entity_id: entity,
+            ...(tariff != null ? { tariff } : {}),
+            ...(currency ? { currency } : {}),
+          })
         } else if (host) {
           await pluginsApi.deleteBinding(haInstallId, saved.id).catch(() => undefined)
         }
@@ -819,10 +834,30 @@ function HostEditorModal({
               label="HA power entity (com.vortex.ha_power)"
               value={haEntityId}
               onChange={(e) => setHaEntityId(e.target.value)}
-              placeholder="sensor.plug_energy or sensor.xxx_power"
+              placeholder="sensor.xxx_total_energy or sensor.xxx_power"
             />
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Input
+                label="Energy tariff / kWh"
+                type="number"
+                step="0.0001"
+                min={0}
+                value={haTariff}
+                onChange={(e) => setHaTariff(e.target.value)}
+                placeholder="e.g. 5.5"
+              />
+              <Input
+                label="Energy currency"
+                value={haCurrency}
+                onChange={(e) => setHaCurrency(e.target.value.toUpperCase())}
+                maxLength={8}
+                placeholder="RUB"
+              />
+            </div>
             <p className="mt-1 font-mono text-[10px] text-muted">
-              One Home Assistant entity per host. Leave empty to unbind.
+              Bind any entity from the plug device; daemon resolves power/energy/V/A
+              siblings. Tariff is per host (not rental billing). Leave entity empty to
+              unbind.
             </p>
           </div>
         ) : null}
