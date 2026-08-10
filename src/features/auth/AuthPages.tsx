@@ -8,6 +8,7 @@ import { apiKeysApi } from '@/services/telemetryApi'
 import { ApiError } from '@/services/apiClient'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/components/ui/Toast'
+import { userSatisfies2faPolicy } from '@/lib/twoFactorPolicy'
 import {
   buildTuiCallbackUrl,
   parseTuiLinkParams,
@@ -80,7 +81,7 @@ export function LoginPage() {
       await completeTuiLink(tuiLink, me.email)
       return
     }
-    navigate(me.is_2fa_enabled ? '/' : '/security/2fa')
+    navigate(userSatisfies2faPolicy(me) ? '/' : '/security/2fa')
   }
 
   async function onSubmit(e: FormEvent) {
@@ -369,7 +370,7 @@ export function VerifyEmailPage() {
         setStatus('ok')
         setMessage('Email confirmed — redirecting…')
         toast('Email confirmed')
-        navigate(me.is_2fa_enabled ? '/' : '/security/2fa', { replace: true })
+        navigate(userSatisfies2faPolicy(me) ? '/' : '/security/2fa', { replace: true })
       } catch (err) {
         if (cancelled) return
         setStatus('error')

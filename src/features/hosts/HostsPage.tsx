@@ -16,6 +16,7 @@ import { Toggle } from '@/components/ui/Toggle'
 import { toast, toastCopy } from '@/components/ui/Toast'
 import { buildAgentInstallBundle } from '@/features/hosts/agentInstall'
 import { countryFlag } from '@/lib/countryFlag'
+import { userSatisfies2faPolicy } from '@/lib/twoFactorPolicy'
 import { HostPluginMetricCell, HostPluginPanels } from '@/plugins/HostPluginPanels'
 import { findHaPowerInstallId } from '@/plugins/EnergyCalendar'
 import { usePluginUiBundle, useSlotContributions } from '@/plugins/usePluginUiBundle'
@@ -44,12 +45,13 @@ function downloadScript(filename: string, content: string) {
 export function HostsPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const is2faEnabled = useAuthStore((s) => s.user?.is_2fa_enabled ?? false)
+  const user = useAuthStore((s) => s.user)
+  const twoFaOk = userSatisfies2faPolicy(user)
   const hostsQuery = useQuery({ queryKey: ['hosts'], queryFn: () => hostsApi.list() })
   const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() })
 
   function require2faForAgent(): boolean {
-    if (is2faEnabled) return true
+    if (twoFaOk) return true
     toast('Enable 2FA to install or rotate agents', 'error')
     navigate('/security/2fa', { state: { from: '/hosts' } })
     return false
