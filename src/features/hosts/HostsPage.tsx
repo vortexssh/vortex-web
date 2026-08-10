@@ -64,6 +64,7 @@ export function HostsPage() {
   const [editor, setEditor] = useState<Host | 'new' | null>(null)
   const [enroll, setEnroll] = useState<EnrollState | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [renewTarget, setRenewTarget] = useState<Host | null>(null)
   const pluginColumns = useSlotContributions('hosts.table.columns')
   const pluginBundle = usePluginUiBundle()
   const pluginInstalls = pluginBundle.data?.installs
@@ -120,6 +121,7 @@ export function HostsPage() {
   const renewMutation = useMutation({
     mutationFn: (id: string) => hostsApi.advanceBilling(id),
     onSuccess: (host) => {
+      setRenewTarget(null)
       void qc.invalidateQueries({ queryKey: ['hosts'] })
       void qc.invalidateQueries({ queryKey: ['billing'] })
       toast(
@@ -250,7 +252,7 @@ export function HostsPage() {
             <HostBillingExpand
               host={h}
               renewing={renewMutation.isPending && renewMutation.variables === h.id}
-              onRenew={() => renewMutation.mutate(h.id)}
+              onRenew={() => setRenewTarget(h)}
             />
             <HostPluginPanels host={h} />
           </div>
@@ -309,7 +311,7 @@ export function HostsPage() {
                     className="!px-2 !text-[10px]"
                     title="Mark paid — advance to next period"
                     disabled={renewMutation.isPending}
-                    onClick={() => renewMutation.mutate(h.id)}
+                    onClick={() => setRenewTarget(h)}
                   >
                     Renew
                   </Button>
@@ -517,6 +519,37 @@ export function HostsPage() {
           </div>
         ) : null}
       </Modal>
+
+      <Modal
+        open={Boolean(renewTarget)}
+        title="Confirm renew"
+        onClose={() => setRenewTarget(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRenewTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={renewMutation.isPending || !renewTarget}
+              onClick={() => {
+                if (renewTarget) renewMutation.mutate(renewTarget.id)
+              }}
+            >
+              {renewMutation.isPending ? 'Renewing…' : 'Yes, mark paid'}
+            </Button>
+          </>
+        }
+      >
+        {renewTarget ? (
+          <p className="text-sm text-dim">
+            Mark «{renewTarget.name}» as paid and advance next due from{' '}
+            <span className="font-mono text-neon">
+              {renewTarget.billing_renewal_at ?? '—'}
+            </span>{' '}
+            by one {renewTarget.billing_cycle ?? 'billing'} period?
+          </p>
+        ) : null}
+      </Modal>
     </div>
   )
 }
@@ -662,6 +695,7 @@ function HostEditorModal({
   const [haCurrency, setHaCurrency] = useState(
     String(existingHaBinding?.currency ?? ''),
   )
+  const [confirmAdvance, setConfirmAdvance] = useState(false)
 
   const advanceMutation = useMutation({
     mutationFn: () => {
@@ -669,6 +703,7 @@ function HostEditorModal({
       return hostsApi.advanceBilling(host.id)
     },
     onSuccess: () => {
+      setConfirmAdvance(false)
       void qc.invalidateQueries({ queryKey: ['hosts'] })
       void qc.invalidateQueries({ queryKey: ['billing'] })
       toast('Renewal advanced to next period', 'success')
@@ -781,6 +816,7 @@ function HostEditorModal({
   }
 
   return (
+    <>
     <Modal
       open
       title={host ? 'Edit host' : 'Add host'}
@@ -923,7 +959,7 @@ function HostEditorModal({
                   type="button"
                   variant="outline"
                   disabled={advanceMutation.isPending}
-                  onClick={() => advanceMutation.mutate()}
+                  onClick={() => setConfirmAdvance(true)}
                 >
                   Mark paid · renew period
                 </Button>
@@ -1021,5 +1057,30 @@ function HostEditorModal({
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </form>
     </Modal>
+    <Modal
+      open={confirmAdvance}
+      title="Confirm renew"
+      onClose={() => setConfirmAdvance(false)}
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => setConfirmAdvance(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={advanceMutation.isPending}
+            onClick={() => advanceMutation.mutate()}
+          >
+            {advanceMutation.isPending ? 'Renewing…' : 'Yes, mark paid'}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-dim">
+        Mark «{host?.name}» as paid and advance next due from{' '}
+        <span className="font-mono text-neon">{host?.billing_renewal_at ?? '—'}</span> by
+        one {host?.billing_cycle ?? 'billing'} period?
+      </p>
+    </Modal>
+    </>
   )
 }

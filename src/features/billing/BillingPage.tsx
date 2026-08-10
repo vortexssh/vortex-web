@@ -6,6 +6,7 @@ import type { BillingHostBrief } from '@/types'
 import { countryFlag } from '@/lib/countryFlag'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { ApiError } from '@/services/apiClient'
 import { toast } from '@/components/ui/Toast'
 
@@ -38,6 +39,14 @@ export function BillingPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [selectedPayerId, setSelectedPayerId] = useState<string>('')
+  const [renewTarget, setRenewTarget] = useState<{
+    id: string
+    name: string
+    due: string | null
+    cycle: string | null
+    amount: string | null
+    currency: string | null
+  } | null>(null)
   const today = todayIso()
 
   const payerFilter = selectedPayerId || undefined
@@ -62,6 +71,7 @@ export function BillingPage() {
   const renewMutation = useMutation({
     mutationFn: (hostId: string) => billingApi.advance(hostId),
     onSuccess: () => {
+      setRenewTarget(null)
       void qc.invalidateQueries({ queryKey: ['billing'] })
       void qc.invalidateQueries({ queryKey: ['hosts'] })
       toast('Marked paid · period renewed', 'success')
@@ -272,7 +282,13 @@ export function BillingPage() {
                   {hosts.slice(0, 3).map((h) => (
                     <span
                       key={`${h.id}-${h.is_next ? 'n' : 'p'}`}
-                      title={`${h.name}${h.payer_name ? ` · ${h.payer_name}` : ''}${h.is_next ? '' : ' (projected)'}`}
+                      title={`${h.name}${h.payer_name ? ` · ${h.payer_name}` : ''}${
+                        h.is_next
+                          ? ''
+                          : cell.date && cell.date < today
+                            ? ' (paid)'
+                            : ' (projected)'
+                      }`}
                       className={`text-sm leading-none ${h.is_next ? '' : 'opacity-35 grayscale'}`}
                     >
                       {countryFlag(h.country_code)}
@@ -289,7 +305,7 @@ export function BillingPage() {
       </div>
 
       <p className="font-mono text-[10px] text-muted">
-        Bright flags = next renewal · dimmed = projected future period
+        Bright = next due · dimmed past = paid (after Renew) · dimmed future = projected
       </p>
 
       <section className="rounded-lg border border-border bg-panel p-4">
@@ -328,7 +344,7 @@ export function BillingPage() {
                     ) : null}
                     {!h.is_next ? (
                       <span className="ml-2 font-mono text-[10px] uppercase text-muted">
-                        projected
+                        {selectedDay && selectedDay < today ? 'paid' : 'projected'}
                       </span>
                     ) : null}
                   </div>
@@ -347,7 +363,16 @@ export function BillingPage() {
                       className="!px-2 !text-[10px]"
                       title="Mark paid at provider — advance next due"
                       disabled={renewMutation.isPending}
-                      onClick={() => renewMutation.mutate(h.id)}
+                      onClick={() =>
+                        setRenewTarget({
+                          id: h.id,
+                          name: h.name,
+                          due: selectedDay,
+                          cycle: h.cycle,
+                          amount: h.billing_amount,
+                          currency: h.billing_currency,
+                        })
+                      }
                     >
                       {renewMutation.isPending && renewMutation.variables === h.id
                         ? '…'
@@ -385,7 +410,16 @@ export function BillingPage() {
                     variant="outline"
                     className="!px-2 !text-[10px]"
                     disabled={renewMutation.isPending}
-                    onClick={() => renewMutation.mutate(item.host_id)}
+                    onClick={() =>
+                      setRenewTarget({
+                        id: item.host_id,
+                        name: item.host_name,
+                        due: item.renewal_at,
+                        cycle: item.cycle,
+                        amount: item.amount,
+                        currency: item.currency,
+                      })
+                    }
                   >
                     Renew
                   </Button>
@@ -395,6 +429,44 @@ export function BillingPage() {
           </ul>
         </section>
       ) : null}
+
+      <Modal
+        open={Boolean(renewTarget)}
+        title="Confirm renew"
+        onClose={() => setRenewTarget(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRenewTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={renewMutation.isPending || !renewTarget}
+              onClick={() => {
+                if (renewTarget) renewMutation.mutate(renewTarget.id)
+              }}
+            >
+              {renewMutation.isPending ? 'Renewing…' : 'Yes, mark paid'}
+            </Button>
+          </>
+        }
+      >
+        {renewTarget ? (
+          <p className="text-sm text-dim">
+            Mark «{renewTarget.name}» as paid
+            {renewTarget.amount != null
+              ? ` (${renewTarget.amount} ${renewTarget.currency ?? ''})`
+              : ''}{' '}
+            and advance next due
+            {renewTarget.due ? (
+              <>
+                {' '}
+                from <span className="font-mono text-neon">{renewTarget.due}</span>
+              </>
+            ) : null}{' '}
+            by one {renewTarget.cycle ?? 'billing'} period?
+          </p>
+        ) : null}
+      </Modal>
     </div>
   )
 }
