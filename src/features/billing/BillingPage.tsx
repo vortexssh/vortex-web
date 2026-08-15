@@ -118,19 +118,44 @@ export function BillingPage() {
     ? payersQuery.data?.find((p) => p.id === selectedPayerId)?.name
     : null
 
+  const viewingCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1
+  const viewingPast =
+    year < now.getFullYear() ||
+    (year === now.getFullYear() && month < now.getMonth() + 1)
+
   const monthStats = useMemo(() => {
+    const days = calendarQuery.data?.days ?? []
+    // Paid marks keep is_next=false; next due keeps is_next=true. Projected
+    // occurrences are is_next=false after that host's next date (or in future months).
+    const nextDateByHost = new Map<string, string>()
+    for (const day of days) {
+      for (const h of day.hosts) {
+        if (h.is_next) nextDateByHost.set(h.id, day.date)
+      }
+    }
+
     let total = 0
     let remaining = 0
     let counted = 0
-    for (const day of calendarQuery.data?.days ?? []) {
+    for (const day of days) {
       for (const h of day.hosts) {
         if (h.amount_converted == null) continue
         const amt = Number(h.amount_converted)
         if (!Number.isFinite(amt)) continue
         counted += 1
         total += amt
-        // Future dates + overdue next renewals still count as unpaid.
-        if (day.date >= today || h.is_next) remaining += amt
+        if (h.is_next) {
+          remaining += amt
+          continue
+        }
+        // Never count paid marks after Renew (same-day / early advance).
+        const nextDate = nextDateByHost.get(h.id)
+        if (nextDate != null) {
+          if (day.date > nextDate) remaining += amt
+          continue
+        }
+        if (!viewingPast && !viewingCurrentMonth) remaining += amt
       }
     }
     return {
@@ -139,7 +164,7 @@ export function BillingPage() {
       counted,
       ready: Boolean(calendarQuery.data),
     }
-  }, [calendarQuery.data, today])
+  }, [calendarQuery.data, viewingCurrentMonth, viewingPast])
 
   function formatMoney(n: number) {
     return n.toLocaleString('en', {
@@ -147,9 +172,6 @@ export function BillingPage() {
       maximumFractionDigits: 2,
     })
   }
-
-  const viewingCurrentMonth =
-    year === now.getFullYear() && month === now.getMonth() + 1
 
   return (
     <div className="flex flex-col gap-6">
@@ -194,8 +216,8 @@ export function BillingPage() {
               <span className="font-mono text-base text-neon">{currency}</span>
             </p>
             <p className="mt-1 font-mono text-[10px] text-muted">
-              From today forward
-              {viewingCurrentMonth ? ' · includes overdue' : ''}
+              Next dues
+              {viewingCurrentMonth ? ' · includes overdue · excludes paid' : ''}
             </p>
           </div>
           <div className="rounded-lg border border-border bg-panel px-4 py-3">
