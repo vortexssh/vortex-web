@@ -31,6 +31,8 @@ export function PluginPage() {
     refetchInterval: 10_000,
   })
 
+  const [calendarHostId, setCalendarHostId] = useState('')
+
   if (bundle.isLoading) {
     return <div className="font-mono text-xs text-muted">loading plugins…</div>
   }
@@ -45,7 +47,7 @@ export function PluginPage() {
 
   const view = (routeContrib.view ?? { type: 'text', text: 'Empty view' }) as DeclarativeNode
   const bindings = install.host_bindings ?? []
-  const [calendarHostId, setCalendarHostId] = useState(bindings[0]?.host_id ?? '')
+  const activeCalendarHostId = calendarHostId || bindings[0]?.host_id || ''
   const showEnergy =
     install.plugin_id === 'com.vortex.ha_power' && bindings.length > 0
 
@@ -77,7 +79,7 @@ export function PluginPage() {
             Calendar host
             <select
               className="rounded-md border border-border bg-void px-2 py-1.5 font-mono text-xs text-fg-strong"
-              value={calendarHostId}
+              value={activeCalendarHostId}
               onChange={(e) => setCalendarHostId(e.target.value)}
             >
               {bindings.map((b) => (
@@ -87,8 +89,8 @@ export function PluginPage() {
               ))}
             </select>
           </label>
-          {calendarHostId ? (
-            <EnergyCalendar installId={install.id} hostId={calendarHostId} />
+          {activeCalendarHostId ? (
+            <EnergyCalendar installId={install.id} hostId={activeCalendarHostId} />
           ) : null}
         </div>
       ) : null}

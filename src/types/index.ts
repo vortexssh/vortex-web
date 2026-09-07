@@ -210,6 +210,7 @@ export interface BillingHostBrief {
   amount_converted: string | null
   country_code: string | null
   is_next: boolean
+  next_renewal_at?: string | null
   cycle: string | null
   payer_id: string | null
   payer_name: string | null

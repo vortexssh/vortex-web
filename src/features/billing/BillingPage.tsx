@@ -120,51 +120,33 @@ export function BillingPage() {
 
   const viewingCurrentMonth =
     year === now.getFullYear() && month === now.getMonth() + 1
-  const viewingPast =
-    year < now.getFullYear() ||
-    (year === now.getFullYear() && month < now.getMonth() + 1)
 
   const monthStats = useMemo(() => {
     const days = calendarQuery.data?.days ?? []
-    // Paid marks keep is_next=false; next due keeps is_next=true. Projected
-    // occurrences are is_next=false after that host's next date (or in future months).
-    const nextDateByHost = new Map<string, string>()
-    for (const day of days) {
-      for (const h of day.hosts) {
-        if (h.is_next) nextDateByHost.set(h.id, day.date)
-      }
-    }
-
     let total = 0
-    let remaining = 0
-    let counted = 0
     for (const day of days) {
       for (const h of day.hosts) {
         if (h.amount_converted == null) continue
         const amt = Number(h.amount_converted)
         if (!Number.isFinite(amt)) continue
-        counted += 1
         total += amt
-        if (h.is_next) {
-          remaining += amt
-          continue
-        }
-        // Never count paid marks after Renew (same-day / early advance).
-        const nextDate = nextDateByHost.get(h.id)
-        if (nextDate != null) {
-          if (day.date > nextDate) remaining += amt
-          continue
-        }
-        if (!viewingPast && !viewingCurrentMonth) remaining += amt
       }
     }
+
+    let remaining = 0
+    for (const item of summaryQuery.data?.items ?? []) {
+      if (item.amount_converted == null) continue
+      const amt = Number(item.amount_converted)
+      if (Number.isFinite(amt)) remaining += amt
+    }
+
     return {
       total,
       remaining,
-      counted,
-      ready: Boolean(calendarQuery.data),
+      counted: (summaryQuery.data?.items ?? []).length,
+      ready: Boolean(calendarQuery.data && summaryQuery.data),
     }
-  }, [calendarQuery.data, viewingCurrentMonth, viewingPast])
+  }, [calendarQuery.data, summaryQuery.data])
 
   function formatMoney(n: number) {
     return n.toLocaleString('en', {
